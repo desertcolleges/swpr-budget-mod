@@ -283,3 +283,47 @@ tr:last-child td {
     width: 100%;
   }
 }
+
+.small-button {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.review-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.status-pending {
+  background: #fff4cc;
+  color: #7a5c00;
+}
+
+.status-approved {
+  background: #dcfae6;
+  color: #067647;
+}
+
+.status-rejected {
+  background: #fee4e2;
+  color: #b42318;
+}
+
+hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+a {
+  color: var(--primary);
+}
