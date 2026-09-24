@@ -1,0 +1,35 @@
+<!-- This is a partial view for the Budget Health Dashboard -->
+<div id="dashboard-view" class="view-container">
+  <h2>Budget Health Summary for <span id="dashboard-institution-name"></span></h2>
+  <p>This is a high-level summary of your budget categories. Any category with a negative remaining balance requires a budget modification.</p>
+
+  <div id="deficit-message" class="alert alert-danger" style="display: none;">
+    <strong>Deficit Detected!</strong> A budget modification is required to resolve negative balances.
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Object Category</th>
+          <th>Total Budget</th>
+          <th>Expenditures</th>
+          <th>Remaining Budget</th>
+        </tr>
+      </thead>
+      <tbody id="dashboard-tbody">
+        <!-- Rows will be populated by JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="view-actions">
+    <button id="go-to-editor-btn" class="btn btn-primary">Create Budget Modification</button>
+  </div>
+</div>
+
+<script>
+  // Set the institution name in the title
+  document.getElementById('dashboard-institution-name').textContent = currentInstitution;
+</script>
