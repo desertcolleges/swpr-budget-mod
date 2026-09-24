@@ -3,20 +3,119 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Budget Tool</title>
+
+    <title>Budget Modification Tool</title>
+
     <link rel="stylesheet" href="styles.css" />
   </head>
+
   <body>
-    <div class="container">
-      <h1>Budget Tool</h1>
+    <main class="container">
+      <header class="page-header">
+        <div>
+          <h1>Budget Modification Tool</h1>
+          <p>Review your current budget and submit a modification request.</p>
+        </div>
+      </header>
 
-      <label for="institutionSelect">Institution</label>
-      <select id="institutionSelect">
-        <option value="">Loading institutions...</option>
-      </select>
+      <section class="card">
+        <label for="institutionSelect">Select Institution</label>
 
-      <div id="results"></div>
-    </div>
+        <select id="institutionSelect">
+          <option value="">Loading institutions...</option>
+        </select>
+
+        <button id="loadBudgetButton" class="button primary">
+          View Budget
+        </button>
+      </section>
+
+      <div id="messageArea"></div>
+
+      <section id="budgetSection" class="hidden">
+        <div class="section-header">
+          <div>
+            <h2 id="institutionHeading"></h2>
+            <p>Current budget and expenditures</p>
+          </div>
+
+          <button id="startModificationButton" class="button primary">
+            Create Modification
+          </button>
+        </div>
+
+        <div id="summaryCards" class="summary-grid"></div>
+
+        <div id="budgetResults"></div>
+      </section>
+
+      <section id="modificationSection" class="hidden">
+        <div class="section-header">
+          <div>
+            <h2>Submit Budget Modification</h2>
+            <p>
+              The proposed budget must equal the current total budget.
+            </p>
+          </div>
+
+          <button id="cancelModificationButton" class="button secondary">
+            Cancel
+          </button>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span>Current Total</span>
+            <strong id="currentTotal">$0.00</strong>
+          </div>
+
+          <div class="summary-card">
+            <span>Proposed Total</span>
+            <strong id="proposedTotal">$0.00</strong>
+          </div>
+
+          <div class="summary-card">
+            <span>Difference</span>
+            <strong id="totalDifference">$0.00</strong>
+          </div>
+        </div>
+
+        <div id="modificationRows" class="table-wrapper"></div>
+
+        <form id="submissionForm" class="card form-card">
+          <h3>Requester Information</h3>
+
+          <div class="form-grid">
+            <div>
+              <label for="requesterName">Your Name *</label>
+              <input id="requesterName" type="text" required />
+            </div>
+
+            <div>
+              <label for="requesterEmail">Email Address *</label>
+              <input id="requesterEmail" type="email" required />
+            </div>
+          </div>
+
+          <label for="justification">Justification *</label>
+          <textarea
+            id="justification"
+            rows="5"
+            required
+            placeholder="Explain the reason for this modification."
+          ></textarea>
+
+          <button id="submitButton" class="button success" type="submit">
+            Submit for Approval
+          </button>
+        </form>
+      </section>
+
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <span>Loading...</span>
+      </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
