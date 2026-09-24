@@ -1,0 +1,81 @@
+<!-- This is a partial view for the Budget Editor -->
+<div id="editor-view" class="view-container">
+  <h2>Budget Modification for <span id="editor-institution-name"></span></h2>
+  <p>Edit your budget lines below. You can modify existing lines, add new lines, or delete lines. The total budget for the institution must remain the same.</p>
+
+  <div class="table-responsive">
+    <table class="table table-bordered" id="budget-editor-table">
+      <thead>
+        <!-- Headers will be populated by JavaScript -->
+      </thead>
+      <tbody id="editor-tbody">
+        <!-- Rows will be populated by JavaScript -->
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="view-actions">
+     <button id="add-row-btn" class="btn btn-secondary">Add New Line</button>
+  </div>
+
+  <div class="form-group">
+    <label for="justification">Justification for Changes:</label>
+    <textarea id="justification" class="form-control" rows="4" placeholder="Please explain the reason for these budget modifications..."></textarea>
+  </div>
+
+  <div class="view-actions">
+    <button id="submit-modification-btn" class="btn btn-success">Submit for Approval</button>
+    <button id="cancel-btn" class="btn btn-danger">Cancel</button>
+  </div>
+</div>
+
+<script>
+  // This script block runs when the editor is loaded.
+  // It sets up the editor table and event listeners.
+  
+  document.getElementById('editor-institution-name').textContent = currentInstitution;
+  
+  // Placeholder for populating the editor table.
+  // The actual implementation will be more complex.
+  function populateEditorTable(headers, data) {
+    const table = document.getElementById('budget-editor-table');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    // Create headers
+    const headerRow = thead.insertRow();
+    headers.forEach(headerText => {
+      const th = document.createElement('th');
+      th.textContent = headerText;
+      headerRow.appendChild(th);
+    });
+    const thAction = document.createElement('th');
+    thAction.textContent = 'Actions';
+    headerRow.appendChild(thAction);
+
+
+    // Create data rows
+    data.forEach(rowData => {
+      const row = tbody.insertRow();
+      rowData.forEach(cellData => {
+        const cell = row.insertCell();
+        cell.innerHTML = `<input type="text" class="form-control" value="${cellData}">`;
+      });
+      // Add a delete button
+      const actionCell = row.insertCell();
+      actionCell.innerHTML = '<button class="btn btn-danger btn-sm">Delete</button>';
+    });
+  }
+  
+  // This is a placeholder for the more complex logic that will be built in the next iteration.
+  document.getElementById('submit-modification-btn').addEventListener('click', function() {
+    alert('Submission logic will be implemented in the next version!');
+    // In the future, this will collect all data from the table, validate it,
+    // and send it to the server via google.script.run.
+  });
+  
+  document.getElementById('cancel-btn').addEventListener('click', handleLoadBudget); // Go back to dashboard
+  
+</script>
