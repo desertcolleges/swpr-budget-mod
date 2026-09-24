@@ -1,1 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
 
+    <title>Budget Administration</title>
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <main class="container">
+      <header class="page-header">
+        <h1>Budget Administration</h1>
+        <p>Review submitted budget modification requests.</p>
+      </header>
+
+      <div id="messageArea"></div>
+
+      <!-- Login -->
+      <section id="loginSection" class="card">
+        <h2>Administrator Login</h2>
+
+        <form id="loginForm">
+          <label for="loginEmail">Email Address</label>
+          <input
+            id="loginEmail"
+            type="email"
+            required
+            autocomplete="email"
+          />
+
+          <label for="loginPassword">Password</label>
+          <input
+            id="loginPassword"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
+
+          <button class="button primary" type="submit">
+            Sign In
+          </button>
+        </form>
+      </section>
+
+      <!-- Dashboard -->
+      <section id="adminSection" class="hidden">
+        <div class="section-header">
+          <div>
+            <h2>Requests</h2>
+            <p id="signedInUser"></p>
+          </div>
+
+          <button id="logoutButton" class="button secondary">
+            Sign Out
+          </button>
+        </div>
+
+        <div class="card">
+          <label for="statusFilter">Filter by status</label>
+
+          <select id="statusFilter">
+            <option value="">All Requests</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div id="requestList" class="table-wrapper"></div>
+      </section>
+
+      <!-- Review -->
+      <section id="reviewSection" class="hidden">
+        <div class="section-header">
+          <h2>
+            Review Request
+            <span id="reviewRequestNumber"></span>
+          </h2>
+
+          <button id="backToRequestsButton" class="button secondary">
+            Back to Requests
+          </button>
+        </div>
+
+        <div id="requestMetadata" class="card"></div>
+
+        <div id="modificationDetails" class="table-wrapper"></div>
+
+        <div id="reviewActions" class="card">
+          <h3>Review Decision</h3>
+
+          <label for="adminNotes">Notes</label>
+          <textarea id="adminNotes" rows="4"></textarea>
+
+          <div class="review-buttons">
+            <button
+              id="approveButton"
+              class="button success"
+            >
+              Approve Request
+            </button>
+
+            <button
+              id="rejectButton"
+              class="button danger"
+            >
+              Reject Request
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <span>Loading...</span>
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>
