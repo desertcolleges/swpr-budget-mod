@@ -10,12 +10,18 @@
     <main class="container">
       <header class="page-header branded-header">
         <div class="brand-lockup">
-          <div class="brand-mark" aria-hidden="true">IEDRC</div>
+          <img
+            class="brand-logo"
+            src="images/iedrc-logo.svg"
+            alt="IEDRC logo"
+          />
           <div>
             <h1>IEDRC Budget Modification Tool</h1>
             <p>Review current budgets and submit one round-specific modification request.</p>
             <p class="header-links">
               <a href="/swpr-budget-mod/status.html">Check Request Status</a>
+              <span>•</span>
+              <a href="/swpr-budget-mod/admin.html">Admin</a>
             </p>
           </div>
         </div>
@@ -79,11 +85,10 @@
           </div>
           <div class="button-row">
             <button id="cancelModificationButton" class="button secondary">Cancel</button>
-            <button id="addNewLineButton" class="button primary" type="button">Add New Budget Line</button>
           </div>
         </div>
 
-        <div class="summary-grid">
+        <div class="summary-grid sticky-summary">
           <div class="summary-card">
             <span>Current Total</span>
             <strong id="currentTotal">$0.00</strong>
@@ -98,7 +103,17 @@
           </div>
         </div>
 
-        <div id="modificationRows" class="table-wrapper"></div>
+        <div id="modificationRows"></div>
+
+        <div class="button-row">
+          <button
+            id="continueToRequesterInfoButton"
+            class="button secondary"
+            type="button"
+          >
+            Continue to Requester Info
+          </button>
+        </div>
 
         <form id="submissionForm" class="card form-card">
           <h3>Requester Information</h3>
