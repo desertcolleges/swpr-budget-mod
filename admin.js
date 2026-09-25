@@ -52,8 +52,35 @@ async function loadExistingSession() {
   }
 
   if (data.session) {
+    const isAuthorized = await isAdminUser(data.session.user.id);
+
+    if (!isAuthorized) {
+      await supabaseClient.auth.signOut();
+      showMessage(
+        'This account does not have admin access.',
+        'error'
+      );
+      return;
+    }
+
     await showAdminDashboard(data.session);
   }
+}
+
+async function isAdminUser(userId) {
+  const { data, error } = await supabaseClient
+    .from('admin_users')
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('active', true)
+    .limit(1);
+
+  if (error) {
+    console.error('Admin check failed:', error);
+    return false;
+  }
+
+  return Array.isArray(data) && data.length > 0;
 }
 
 async function signIn(event) {
@@ -76,6 +103,15 @@ async function signIn(event) {
       });
 
     if (error) throw error;
+
+    const isAuthorized = await isAdminUser(data.user.id);
+
+    if (!isAuthorized) {
+      await supabaseClient.auth.signOut();
+      throw new Error(
+        'This account does not have admin access.'
+      );
+    }
 
     await showAdminDashboard(data.session);
   } catch (error) {
@@ -437,6 +473,13 @@ async function processRequest(action) {
 
     if (error) throw error;
 
+    await notifyRequester(
+      request.requester_email,
+      request.request_number,
+      action,
+      notes
+    );
+
     showMessage(
       `Request marked as ${action}.`,
       'success'
@@ -451,6 +494,44 @@ async function processRequest(action) {
     );
   } finally {
     showLoading(false);
+  }
+}
+
+async function notifyRequester(
+  email,
+  requestNumber,
+  action,
+  notes
+) {
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/send-approval`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          requester_email: email,
+          request_number: requestNumber,
+          action: action,
+          notes: notes
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error(
+        'Approval email failed:',
+        result.error || 'Unknown error'
+      );
+    }
+  } catch (error) {
+    console.error('Approval email failed:', error);
   }
 }
 
