@@ -2,68 +2,62 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-
-    <title>Budget Administration</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IEDRC Budget Administration</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-
   <body>
     <main class="container">
-      <header class="page-header">
-        <h1>Budget Administration</h1>
-        <p>Review submitted budget modification requests.</p>
+      <header class="page-header branded-header">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">IEDRC</div>
+          <div>
+            <h1>IEDRC Budget Administration</h1>
+            <p>Review requests, configure visible rounds, and manage workflow settings.</p>
+          </div>
+        </div>
       </header>
 
       <div id="messageArea"></div>
 
-      <!-- Login -->
       <section id="loginSection" class="card">
         <h2>Administrator Login</h2>
-
         <form id="loginForm">
           <label for="loginEmail">Email Address</label>
-          <input
-            id="loginEmail"
-            type="email"
-            required
-            autocomplete="email"
-          />
-
+          <input id="loginEmail" type="email" required autocomplete="email" />
           <label for="loginPassword">Password</label>
-          <input
-            id="loginPassword"
-            type="password"
-            required
-            autocomplete="current-password"
-          />
-
-          <button class="button primary" type="submit">
-            Sign In
-          </button>
+          <input id="loginPassword" type="password" required autocomplete="current-password" />
+          <button class="button primary" type="submit">Sign In</button>
         </form>
       </section>
 
-      <!-- Dashboard -->
       <section id="adminSection" class="hidden">
         <div class="section-header">
           <div>
-            <h2>Requests</h2>
+            <h2>Admin Dashboard</h2>
             <p id="signedInUser"></p>
           </div>
+          <button id="logoutButton" class="button secondary">Sign Out</button>
+        </div>
 
-          <button id="logoutButton" class="button secondary">
-            Sign Out
-          </button>
+        <div class="card">
+          <h3>Requester Round Visibility</h3>
+          <p>Select the rounds visible to requesters.</p>
+          <form id="roundSettingsForm">
+            <div id="roundSettingsGrid" class="checkbox-grid"></div>
+            <button id="saveRoundSettingsButton" class="button primary" type="submit">Save Round Settings</button>
+          </form>
+        </div>
+
+        <div class="card" id="activityManagementCard">
+          <h3>Activity Management (Placeholder)</h3>
+          <p id="activityManagementPlaceholderText">
+            Future module: define and manage approved project activities and mappings.
+          </p>
         </div>
 
         <div class="card">
           <label for="statusFilter">Filter by status</label>
-
           <select id="statusFilter">
             <option value="">All Requests</option>
             <option value="Pending">Pending</option>
@@ -75,43 +69,25 @@
         <div id="requestList" class="table-wrapper"></div>
       </section>
 
-      <!-- Review -->
       <section id="reviewSection" class="hidden">
         <div class="section-header">
           <h2>
             Review Request
             <span id="reviewRequestNumber"></span>
           </h2>
-
-          <button id="backToRequestsButton" class="button secondary">
-            Back to Requests
-          </button>
+          <button id="backToRequestsButton" class="button secondary">Back to Requests</button>
         </div>
 
         <div id="requestMetadata" class="card"></div>
-
         <div id="modificationDetails" class="table-wrapper"></div>
 
         <div id="reviewActions" class="card">
           <h3>Review Decision</h3>
-
           <label for="adminNotes">Notes</label>
           <textarea id="adminNotes" rows="4"></textarea>
-
           <div class="review-buttons">
-            <button
-              id="approveButton"
-              class="button success"
-            >
-              Approve Request
-            </button>
-
-            <button
-              id="rejectButton"
-              class="button danger"
-            >
-              Reject Request
-            </button>
+            <button id="approveButton" class="button success" type="button">Approve Request</button>
+            <button id="rejectButton" class="button danger" type="button">Reject Request</button>
           </div>
         </div>
       </section>

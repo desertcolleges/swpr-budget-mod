@@ -3,48 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>Budget Modification Tool</title>
-
+    <title>IEDRC Budget Modification Tool</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-
   <body>
     <main class="container">
-      <header class="page-header">
-        <div>
-          <h1>Budget Modification Tool</h1>
-          <p>Review your current budget and submit a modification request.</p>
+      <header class="page-header branded-header">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">IEDRC</div>
+          <div>
+            <h1>IEDRC Budget Modification Tool</h1>
+            <p>Review current budgets and submit one round-specific modification request.</p>
+          </div>
         </div>
       </header>
 
       <section class="card">
         <label for="institutionSelect">Select Institution</label>
-
         <select id="institutionSelect">
           <option value="">Loading institutions...</option>
         </select>
-
-        <button id="loadBudgetButton" class="button primary">
-          View Budget
-        </button>
+        <button id="loadBudgetButton" class="button primary">Load Institution Budget</button>
       </section>
 
       <div id="messageArea"></div>
 
-      <section id="budgetSection" class="hidden">
+      <section id="roundSection" class="hidden">
         <div class="section-header">
           <div>
             <h2 id="institutionHeading"></h2>
-            <p>Current budget and expenditures</p>
+            <p>Available rounds for this institution</p>
           </div>
+        </div>
+        <div id="roundCards" class="round-grid"></div>
+      </section>
 
-          <button id="startModificationButton" class="button primary">
-            Create Modification
-          </button>
+      <section id="roundDetailSection" class="hidden">
+        <div class="section-header">
+          <div>
+            <h2 id="selectedRoundHeading"></h2>
+            <p>Current budget and expenditures for this round</p>
+          </div>
+          <div class="button-row">
+            <button id="backToRoundsButton" class="button secondary">Back to Rounds</button>
+            <button id="startModificationButton" class="button primary">Create Modification</button>
+          </div>
         </div>
 
-        <div id="summaryCards" class="summary-grid"></div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span>Current Round Total</span>
+            <strong id="roundCurrentTotal">$0.00</strong>
+          </div>
+          <div class="summary-card">
+            <span>Total Expenditures</span>
+            <strong id="roundExpenditureTotal">$0.00</strong>
+          </div>
+          <div class="summary-card">
+            <span>Remaining</span>
+            <strong id="roundRemainingTotal">$0.00</strong>
+          </div>
+        </div>
 
         <div id="budgetResults"></div>
       </section>
@@ -52,15 +71,13 @@
       <section id="modificationSection" class="hidden">
         <div class="section-header">
           <div>
-            <h2>Submit Budget Modification</h2>
-            <p>
-              The proposed budget must equal the current total budget.
-            </p>
+            <h2 id="modificationHeading">Submit Budget Modification</h2>
+            <p>The final proposed total must match the current total for this round.</p>
           </div>
-
-          <button id="cancelModificationButton" class="button secondary">
-            Cancel
-          </button>
+          <div class="button-row">
+            <button id="cancelModificationButton" class="button secondary">Cancel</button>
+            <button id="addNewLineButton" class="button primary" type="button">Add New Budget Line</button>
+          </div>
         </div>
 
         <div class="summary-grid">
@@ -68,12 +85,10 @@
             <span>Current Total</span>
             <strong id="currentTotal">$0.00</strong>
           </div>
-
           <div class="summary-card">
             <span>Proposed Total</span>
             <strong id="proposedTotal">$0.00</strong>
           </div>
-
           <div class="summary-card">
             <span>Difference</span>
             <strong id="totalDifference">$0.00</strong>
@@ -84,30 +99,19 @@
 
         <form id="submissionForm" class="card form-card">
           <h3>Requester Information</h3>
-
           <div class="form-grid">
             <div>
               <label for="requesterName">Your Name *</label>
               <input id="requesterName" type="text" required />
             </div>
-
             <div>
               <label for="requesterEmail">Email Address *</label>
               <input id="requesterEmail" type="email" required />
             </div>
           </div>
-
           <label for="justification">Justification *</label>
-          <textarea
-            id="justification"
-            rows="5"
-            required
-            placeholder="Explain the reason for this modification."
-          ></textarea>
-
-          <button id="submitButton" class="button success" type="submit">
-            Submit for Approval
-          </button>
+          <textarea id="justification" rows="5" required placeholder="Explain why this round needs this modification."></textarea>
+          <button id="submitButton" class="button success" type="submit">Submit Round Request</button>
         </form>
       </section>
 

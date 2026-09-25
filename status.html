@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IEDRC Request Status Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="page-header branded-header">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">IEDRC</div>
+          <div>
+            <h1>Request Status Portal</h1>
+            <p>Look up a submitted budget modification request.</p>
+          </div>
+        </div>
+      </header>
+
+      <div id="messageArea"></div>
+
+      <section class="card">
+        <h2>Find Request</h2>
+        <form id="lookupForm">
+          <div class="form-grid">
+            <div>
+              <label for="requestNumberInput">Request Number *</label>
+              <input id="requestNumberInput" type="text" required placeholder="REQ-..." />
+            </div>
+            <div>
+              <label for="requesterEmailInput">Requester Email *</label>
+              <input id="requesterEmailInput" type="email" required placeholder="name@example.edu" />
+            </div>
+          </div>
+          <button class="button primary" type="submit">Lookup Request</button>
+        </form>
+      </section>
+
+      <section id="statusResultSection" class="hidden">
+        <div class="section-header no-print">
+          <h2 id="statusRequestHeading"></h2>
+          <button id="printRecordButton" class="button secondary" type="button">Print / Save PDF</button>
+        </div>
+
+        <article id="statusRecord" class="card printable-record">
+          <div id="requestSummary"></div>
+          <div id="requestModifications" class="table-wrapper"></div>
+          <div id="resubmissionBlock" class="status-callout"></div>
+        </article>
+      </section>
+
+      <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <span>Loading...</span>
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="status.js"></script>
+  </body>
+</html>

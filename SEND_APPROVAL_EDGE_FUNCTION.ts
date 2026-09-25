@@ -3,6 +3,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
 const appBaseUrl = "https://desertcolleges.github.io/swpr-budget-mod";
 
+function escapeHtml(value: unknown): string {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -42,27 +51,29 @@ serve(async (req) => {
       ? `Budget Request Approved: ${request_number}`
       : `Budget Request Rejected: ${request_number}`;
 
+    const escapedRequest = escapeHtml(request_number);
+    const escapedNotes = escapeHtml(notes || "No rejection reason provided.");
+
     const htmlBody = action === "Approved"
       ? `
         <h2>Budget Request Approved</h2>
-        <p>Your budget modification request <strong>${request_number}</strong> has been approved.</p>
-        <p><a href="${statusLink}">View Request Details</a></p>
-        <p>You will be contacted with next steps.</p>
+        <p>Your budget modification request <strong>${escapedRequest}</strong> has been approved.</p>
+        <p><a href="${statusLink}">View Request Status Record</a></p>
+        <p>You can print or save the status record from the portal.</p>
       `
       : `
         <h2>Budget Request Rejected</h2>
-        <p>Your budget modification request <strong>${request_number}</strong> has been rejected.</p>
-        <p><strong>Reason:</strong></p>
-        <p>${notes || "No reason provided"}</p>
-        <p><a href="${statusLink}">View Request and Resubmit</a></p>
-        <p>Please contact your administrator if you have questions.</p>
+        <p>Your budget modification request <strong>${escapedRequest}</strong> has been rejected.</p>
+        <p><strong>Reason:</strong> ${escapedNotes}</p>
+        <p><a href="${statusLink}">View Request Status Record</a></p>
+        <p>This rejection notification does not include a PDF attachment.</p>
       `;
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${resendApiKey}`
+        Authorization: "Bearer " + resendApiKey,
       },
       body: JSON.stringify({
         from: "noreply@desertcolleges.org",
@@ -75,7 +86,6 @@ serve(async (req) => {
     const result = await resendResponse.json();
 
     if (!resendResponse.ok) {
-      console.error("Resend API error:", result);
       return new Response(
         JSON.stringify({ error: result.message || "Failed to send email" }),
         { status: resendResponse.status, headers: { "Content-Type": "application/json" } }
@@ -87,7 +97,6 @@ serve(async (req) => {
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
