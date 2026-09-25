@@ -674,8 +674,23 @@ async function loadActivityManagementPlaceholder() {
     placeholder.textContent =
       `Future module ready. Placeholder table detected with ${count || 0} activity records.`;
   } catch (error) {
+    const message = String(error?.message || '');
+    const missingTable =
+      error?.code === '42P01' ||
+      message.toLowerCase().includes('does not exist');
+
+    if (missingTable) {
+      placeholder.textContent =
+        'Future module: table not available yet in this environment. Apply DATABASE_SETUP.sql to enable it.';
+      return;
+    }
+
     placeholder.textContent =
-      'Future module: table not available yet in this environment. Apply DATABASE_SETUP.sql to enable it.';
+      'Future module: setup exists but could not be loaded. Verify activity_management policies.';
+    showMessage(
+      'Unable to load activity management summary: ' + message,
+      'error'
+    );
   }
 }
 

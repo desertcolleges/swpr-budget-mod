@@ -135,7 +135,7 @@ async function loadSelectedInstitution() {
     showLoading(true);
     clearMessage();
 
-    await loadVisibleRounds();
+    const visibleRoundsPromise = loadVisibleRounds();
 
     const [budgetResult, expenditureResult] = await Promise.all([
       supabaseClient
@@ -153,6 +153,7 @@ async function loadSelectedInstitution() {
         .order('project')
         .order('object_code')
     ]);
+    await visibleRoundsPromise;
 
     if (budgetResult.error) throw budgetResult.error;
     if (expenditureResult.error) throw expenditureResult.error;
@@ -383,10 +384,10 @@ function showModificationView() {
     return;
   }
 
-  state.modificationRows = roundRows.map(row => {
-    state.rowCounter += 1;
+  const startCounter = state.rowCounter;
+  state.modificationRows = roundRows.map((row, index) => {
     return {
-      rowId: `existing-${state.rowCounter}`,
+      rowId: `existing-${startCounter + index + 1}`,
       is_new_line: false,
       is_deleted: false,
       round: state.selectedRound,
@@ -400,6 +401,7 @@ function showModificationView() {
       current_budget: toNumber(row.budget)
     };
   });
+  state.rowCounter += roundRows.length;
 
   hideSections();
   document

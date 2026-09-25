@@ -26,13 +26,6 @@ alter table public.budget_submissions
 alter table public.budget_submissions
   add column if not exists status_access_token text;
 
-update public.budget_submissions
-set status_access_token = encode(gen_random_bytes(16), 'hex')
-where status_access_token is null or length(trim(status_access_token)) = 0;
-
-alter table public.budget_submissions
-  alter column status_access_token set default encode(gen_random_bytes(16), 'hex');
-
 create table if not exists public.activity_management (
   id uuid primary key default gen_random_uuid(),
   project_title text,
@@ -185,9 +178,12 @@ as $$
     and p_requester_email is not null
     and lower(bs.requester_email) = lower(trim(p_requester_email))
     and (
-      p_status_token is null
-      or p_status_token = ''
-      or bs.status_access_token = p_status_token
+      coalesce(trim(bs.status_access_token), '') = ''
+      or (
+        p_status_token is not null
+        and p_status_token <> ''
+        and bs.status_access_token = p_status_token
+      )
     );
 $$;
 
