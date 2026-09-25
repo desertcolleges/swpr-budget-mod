@@ -660,6 +660,27 @@ async function submitModification(event) {
     return;
   }
 
+  const incompleteNewRows = state.modificationRows.filter(
+    row =>
+      row.is_new_line &&
+      !row.is_deleted &&
+      (
+        !String(row.title || '').trim() ||
+        !String(row.proposed_activity_title || '').trim() ||
+        !String(row.object_code || '').trim() ||
+        !String(row.proposed_description || '').trim() ||
+        toNumber(row.proposed_budget) <= 0
+      )
+  );
+
+  if (incompleteNewRows.length > 0) {
+    showMessage(
+      'Each new budget line must include project, activity, object code, revised details, and an amount greater than $0.00.',
+      'error'
+    );
+    return;
+  }
+
   try {
     showLoading(true);
     clearMessage();
