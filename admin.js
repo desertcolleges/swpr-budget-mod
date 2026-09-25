@@ -47,12 +47,17 @@ async function loadExistingSession() {
     await supabaseClient.auth.getSession();
 
   if (error) {
+    console.error('getSession error:', error);
     showMessage(error.message, 'error');
     return;
   }
 
   if (data.session) {
+    console.log('Existing session found:', data.session.user.id);
+
     const isAuthorized = await isAdminUser(data.session.user.id);
+
+    console.log('Admin authorized?:', isAuthorized);
 
     if (!isAuthorized) {
       await supabaseClient.auth.signOut();
@@ -74,6 +79,8 @@ async function isAdminUser(userId) {
     .eq('user_id', userId)
     .eq('active', true)
     .limit(1);
+
+  console.log('isAdminUser query result:', { userId, data, error });
 
   if (error) {
     console.error('Admin check failed:', error);
@@ -104,7 +111,11 @@ async function signIn(event) {
 
     if (error) throw error;
 
+    console.log('Signed in user:', data.user.id);
+
     const isAuthorized = await isAdminUser(data.user.id);
+
+    console.log('isAuthorized:', isAuthorized);
 
     if (!isAuthorized) {
       await supabaseClient.auth.signOut();
@@ -115,6 +126,7 @@ async function signIn(event) {
 
     await showAdminDashboard(data.session);
   } catch (error) {
+    console.error('Sign in failed:', error);
     showMessage(
       'Unable to sign in: ' + error.message,
       'error'
