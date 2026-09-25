@@ -8,8 +8,7 @@ const supabaseClient = window.supabase.createClient(
 
 const state = {
   request: null,
-  modifications: [],
-  statusToken: ''
+  modifications: []
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,18 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const params = new URLSearchParams(window.location.search);
   const requestId = params.get('requestId') || '';
-  const token = params.get('token') || '';
-
-  state.statusToken = token;
 
   if (requestId) {
     document.getElementById('requestNumberInput').value = requestId;
-
-    if (token) {
-      showMessage('Secure request link detected. You can run lookup now.', 'success');
-    } else {
-      showMessage('Enter requester email to view this request.', 'success');
-    }
+    handleLookup(new Event('submit'));
   }
 });
 
@@ -43,16 +34,9 @@ async function handleLookup(event) {
 
   const requestNumber =
     document.getElementById('requestNumberInput').value.trim();
-  const requesterEmail =
-    document.getElementById('requesterEmailInput').value.trim().toLowerCase();
 
   if (!requestNumber) {
     showMessage('Request number is required.', 'error');
-    return;
-  }
-
-  if (!state.statusToken && !requesterEmail) {
-    showMessage('Requester email is required unless using a secure token link.', 'error');
     return;
   }
 
@@ -60,14 +44,16 @@ async function handleLookup(event) {
     showLoading(true);
     clearMessage();
 
-    await fetchBySecureRpc(
-      requestNumber,
-      requesterEmail,
-      state.statusToken
-    );
+    const { data, error } = await supabaseClient.rpc('get_request_status', {
+      p_request_number: requestNumber
+    });
+
+    if (error) throw error;
+
+    hydrateStatusData(data || []);
 
     if (!state.request) {
-      throw new Error('No request matched the provided lookup details.');
+      throw new Error('No request matched that request number.');
     }
 
     renderStatusRecord();
@@ -79,18 +65,7 @@ async function handleLookup(event) {
   }
 }
 
-async function fetchBySecureRpc(requestNumber, requesterEmail, statusToken) {
-  const { data, error } = await supabaseClient.rpc('get_request_status', {
-    p_request_number: requestNumber,
-    p_requester_email: requesterEmail || null,
-    p_status_token: statusToken || null
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = Array.isArray(data) ? data : [];
+function hydrateStatusData(rows) {
   if (!rows.length) {
     state.request = null;
     state.modifications = [];
@@ -98,8 +73,8 @@ async function fetchBySecureRpc(requestNumber, requesterEmail, statusToken) {
   }
 
   const first = rows[0];
+
   state.request = {
-    id: first.submission_id,
     request_number: first.request_number,
     requester_name: first.requester_name,
     requester_email: first.requester_email,
@@ -113,17 +88,16 @@ async function fetchBySecureRpc(requestNumber, requesterEmail, statusToken) {
   };
 
   state.modifications = rows
-    .filter(row => row.title || row.proposed_description || row.activity_title)
+    .filter(row => row.title || row.activity_title || row.object_category || row.object_code)
     .map(row => ({
       title: row.title,
       activity_title: row.activity_title,
-      proposed_activity_title: row.proposed_activity_title,
+      object_category: row.object_category || inferObjectCategory(row.object_code),
       object_code: row.object_code,
-      budget_item_description: row.budget_item_description,
-      proposed_description: row.proposed_description,
       current_budget: row.current_budget,
+      current_budget_description: row.current_budget_description || row.budget_item_description,
       proposed_budget: row.proposed_budget,
-      is_deleted: row.is_deleted,
+      proposed_budget_description: row.proposed_budget_description || row.proposed_description,
       is_new_line: row.is_new_line,
       round: row.modification_round || row.round
     }));
@@ -138,6 +112,7 @@ function renderStatusRecord() {
 
   const summary = document.getElementById('requestSummary');
   const statusClass = getStatusClass(request.status);
+
   summary.innerHTML = `
     <div class="record-grid">
       <p><strong>Requester:</strong> ${escapeHtml(request.requester_name || '')}</p>
@@ -153,7 +128,7 @@ function renderStatusRecord() {
   `;
 
   renderModificationTable();
-  renderResubmissionBlock();
+  renderRecordNotice();
 }
 
 function renderModificationTable() {
@@ -168,41 +143,30 @@ function renderModificationTable() {
     <table>
       <thead>
         <tr>
-          <th>Round</th>
           <th>Project</th>
           <th>Activity</th>
-          <th>Proposed Activity</th>
-          <th>Object Code</th>
-          <th>Current Details</th>
-          <th>Revised Details</th>
+          <th>Object Category</th>
           <th>Current Budget</th>
+          <th>Current Description</th>
           <th>Proposed Budget</th>
-          <th>Flags</th>
+          <th>Proposed Description</th>
+          <th>is_new_line</th>
         </tr>
       </thead>
       <tbody>
   `;
 
   state.modifications.forEach(row => {
-    const isDeleted = Boolean(row.is_deleted);
-    const isNew = Boolean(row.is_new_line);
-
     html += `
-      <tr class="${isDeleted ? 'deleted-row' : ''}">
-        <td>${escapeHtml(row.round || state.request.round || '')}</td>
+      <tr>
         <td>${escapeHtml(row.title)}</td>
         <td>${escapeHtml(row.activity_title)}</td>
-        <td>${escapeHtml(row.proposed_activity_title || '')}</td>
-        <td>${escapeHtml(row.object_code)}</td>
-        <td>${escapeHtml(row.budget_item_description)}</td>
-        <td>${escapeHtml(row.proposed_description)}</td>
+        <td>${escapeHtml(row.object_category)}</td>
         <td class="money">${formatCurrency(row.current_budget)}</td>
+        <td>${escapeHtml(row.current_budget_description || '—')}</td>
         <td class="money">${formatCurrency(row.proposed_budget)}</td>
-        <td>
-          ${isDeleted ? '<span class="flag flag-delete">Marked Deleted</span>' : ''}
-          ${isNew ? '<span class="flag flag-new">New Line</span>' : ''}
-          ${!isDeleted && !isNew ? '<span class="flag">Updated</span>' : ''}
-        </td>
+        <td>${escapeHtml(row.proposed_budget_description || '—')}</td>
+        <td>${row.is_new_line ? '<span class="flag flag-new">true</span>' : 'false'}</td>
       </tr>
     `;
   });
@@ -211,20 +175,27 @@ function renderModificationTable() {
   container.innerHTML = html;
 }
 
-function renderResubmissionBlock() {
+function renderRecordNotice() {
   const block = document.getElementById('resubmissionBlock');
 
-  if (state.request.status === 'Rejected') {
-    block.innerHTML = `
-      <strong>Resubmission:</strong>
-      This request is preserved as an audit record and cannot be edited in place.
-      Submit a new request from the main budget form for this round.
-    `;
-    return;
+  block.innerHTML = `
+    <strong>PDF Export:</strong>
+    Server-side PDF is not implemented yet. Use “Download PDF” to open your browser print dialog and save this page as a PDF.
+  `;
+}
+
+function inferObjectCategory(objectCode) {
+  const codeText = String(objectCode || '').trim();
+  const digits = codeText.replace(/[^0-9]/g, '');
+
+  if (!digits) return '6000s';
+
+  const leading = Number(digits[0]);
+  if (leading >= 1 && leading <= 6) {
+    return `${leading}000s`;
   }
 
-  block.innerHTML =
-    '<strong>Record Notice:</strong> This is a print/download-friendly status record.';
+  return '6000s';
 }
 
 function formatDate(value) {

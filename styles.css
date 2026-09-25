@@ -45,20 +45,15 @@ body {
   gap: 16px;
 }
 
+.brand-logo {
+  width: auto;
+  height: clamp(120px, 16vw, 150px);
+  flex: 0 0 auto;
+}
+
 .header-links {
   margin: 8px 0 0;
   font-size: 0.95rem;
-}
-
-.brand-mark {
-  min-width: 88px;
-  padding: 12px 10px;
-  border-radius: 10px;
-  background: var(--navy);
-  color: #ffffff;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 0.06em;
 }
 
 h1,
@@ -330,6 +325,71 @@ tr:last-child td {
 
 .changed-row td {
   background: #fffaf2;
+}
+
+.modified-indicator {
+  color: #b3520f;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.sticky-summary {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--background);
+  padding-top: 8px;
+}
+
+.project-section {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.project-header {
+  margin: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eaecf0;
+  background: #f8fbff;
+}
+
+.project-content {
+  padding: 14px 16px 18px;
+}
+
+.activity-card {
+  border: 1px solid #eaecf0;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.activity-table {
+  width: 100%;
+  min-width: 920px;
+}
+
+.activity-controls {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.object-row-warning td {
+  background: #fff2f1;
 }
 
 .deleted-row td {

@@ -287,6 +287,7 @@ async function loadRequestDetail(requestId) {
         .eq('submission_id', requestId)
         .order('title')
         .order('activity_title')
+        .order('object_category')
         .order('object_code');
 
     if (error) throw error;
@@ -395,7 +396,7 @@ function renderModificationDetails() {
           <th>Round</th>
           <th>Project</th>
           <th>Activity</th>
-          <th>Proposed Activity</th>
+          <th>Object Category</th>
           <th>Object Code</th>
           <th>Current Description</th>
           <th>Proposed Description</th>
@@ -408,24 +409,24 @@ function renderModificationDetails() {
   `;
 
   request.modifications.forEach(row => {
-    const isDeleted = Boolean(row.is_deleted);
     const isNew = Boolean(row.is_new_line);
+    const objectCategory = row.object_category || inferObjectCategory(row.object_code);
+    const currentDescription = row.current_budget_description || row.budget_item_description || '';
+    const proposedDescription = row.proposed_budget_description || row.proposed_description || '';
 
     html += `
-      <tr class="${isDeleted ? 'deleted-row' : ''}">
+      <tr class="${isNew ? 'changed-row' : ''}">
         <td>${escapeHtml(row.round || request.round || '')}</td>
         <td>${escapeHtml(row.title)}</td>
         <td>${escapeHtml(row.activity_title)}</td>
-        <td>${escapeHtml(row.proposed_activity_title || '')}</td>
+        <td>${escapeHtml(objectCategory)}</td>
         <td>${escapeHtml(row.object_code)}</td>
-        <td>${escapeHtml(row.budget_item_description)}</td>
-        <td>${escapeHtml(row.proposed_description)}</td>
+        <td>${escapeHtml(currentDescription)}</td>
+        <td>${escapeHtml(proposedDescription)}</td>
         <td class="money">${formatCurrency(row.current_budget)}</td>
         <td class="money">${formatCurrency(row.proposed_budget)}</td>
         <td>
-          ${isDeleted ? '<span class="flag flag-delete">Marked Deleted</span>' : ''}
-          ${isNew ? '<span class="flag flag-new">New Line</span>' : ''}
-          ${!isDeleted && !isNew ? '<span class="flag">Updated</span>' : ''}
+          ${isNew ? '<span class="flag flag-new">is_new_line=true</span>' : '<span class="flag">is_new_line=false</span>'}
         </td>
       </tr>
     `;
@@ -736,6 +737,20 @@ function sortRound(a, b) {
 
 function toRoundNumber(round) {
   return Number(String(round || '').replace(/[^0-9]/g, '')) || 0;
+}
+
+function inferObjectCategory(objectCode) {
+  const codeText = String(objectCode || '').trim();
+  const digits = codeText.replace(/[^0-9]/g, '');
+
+  if (!digits) return '6000s';
+
+  const leading = Number(digits[0]);
+  if (leading >= 1 && leading <= 6) {
+    return `${leading}000s`;
+  }
+
+  return '6000s';
 }
 
 function formatCurrency(value) {

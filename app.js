@@ -7,6 +7,7 @@ const supabaseClient = window.supabase.createClient(
 );
 
 const DEFAULT_VISIBLE_ROUNDS = ['R10'];
+const OBJECT_CATEGORIES = ['1000s', '2000s', '3000s', '4000s', '5000s', '6000s'];
 
 const state = {
   institution: '',
@@ -14,18 +15,14 @@ const state = {
   expenditureRows: [],
   visibleRounds: [...DEFAULT_VISIBLE_ROUNDS],
   selectedRound: '',
-  modificationRows: [],
-  rowCounter: 0
+  modificationProjects: [],
+  approvedActivitiesByProject: {},
+  baselineCurrentTotal: 0
 };
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD'
-});
-
-const numberFormatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -46,8 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
     .addEventListener('click', showRoundDetailView);
 
   document
-    .getElementById('addNewLineButton')
-    .addEventListener('click', addNewLine);
+    .getElementById('continueToRequesterInfoButton')
+    .addEventListener('click', () => {
+      document
+        .getElementById('submissionForm')
+        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
   document
     .getElementById('submissionForm')
@@ -55,11 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document
     .getElementById('modificationRows')
-    .addEventListener('input', handleModificationInput);
+    .addEventListener('click', handleModificationClick);
 
   document
     .getElementById('modificationRows')
-    .addEventListener('change', handleModificationInput);
+    .addEventListener('change', handleModificationChange);
+
+  document
+    .getElementById('modificationRows')
+    .addEventListener('focusout', handleModificationBlur);
 
   document
     .getElementById('roundCards')
@@ -153,6 +158,7 @@ async function loadSelectedInstitution() {
         .order('project')
         .order('object_code')
     ]);
+
     await visibleRoundsPromise;
 
     if (budgetResult.error) throw budgetResult.error;
@@ -160,11 +166,12 @@ async function loadSelectedInstitution() {
 
     state.institution = institution;
     state.selectedRound = '';
-    state.modificationRows = [];
+    state.modificationProjects = [];
 
     state.budgetRows = (budgetResult.data || []).map(row => ({
       ...row,
-      inferred_round: getRoundIdentifier(row)
+      inferred_round: getRoundIdentifier(row),
+      object_category: inferObjectCategory(row.object_code)
     }));
 
     state.expenditureRows = expenditureResult.data || [];
@@ -190,25 +197,16 @@ function renderRoundSelection() {
     .classList.remove('hidden');
 
   const cards = document.getElementById('roundCards');
-  const allowedRounds = state.visibleRounds;
-
-  const summaries = allowedRounds
+  const summaries = state.visibleRounds
     .map(round => summarizeRound(round))
     .filter(summary => summary.projectCount > 0);
-  const unmatchedCount = state.budgetRows.filter(
-    row => !row.inferred_round
-  ).length;
 
   if (!summaries.length) {
-    cards.innerHTML = `<p class="card">No visible round data found for this institution.${unmatchedCount > 0 ? ` ${unmatchedCount} row(s) are missing a recognizable round value.` : ''}</p>`;
+    cards.innerHTML = '<p class="card">No visible round data found for this institution.</p>';
     return;
   }
 
-  const unmatchedNotice = unmatchedCount > 0
-    ? `<p class="card">Note: ${unmatchedCount} budget row(s) are not mapped to a recognizable round and are excluded.</p>`
-    : '';
-
-  cards.innerHTML = unmatchedNotice + summaries
+  cards.innerHTML = summaries
     .map(summary => {
       const breakdown = summary.projects
         .slice(0, 5)
@@ -251,8 +249,7 @@ function handleRoundCardClick(event) {
   const button = event.target.closest('[data-round]');
   if (!button) return;
 
-  const round = button.dataset.round;
-  state.selectedRound = round;
+  state.selectedRound = button.dataset.round;
   showRoundDetailView();
 }
 
@@ -374,12 +371,7 @@ function renderBudgetTableForRound(round) {
     });
   });
 
-  html += `
-        </tbody>
-      </table>
-    </div>
-  `;
-
+  html += '</tbody></table></div>';
   container.innerHTML = html;
 }
 
@@ -391,24 +383,13 @@ function showModificationView() {
     return;
   }
 
-  const startCounter = state.rowCounter;
-  state.modificationRows = roundRows.map((row, index) => {
-    return {
-      rowId: `existing-${startCounter + index + 1}`,
-      is_new_line: false,
-      is_deleted: false,
-      round: state.selectedRound,
-      title: row.title || '',
-      activity_title: row.activity_title || '',
-      object_code: row.object_code || '',
-      budget_item_description: row.budget_item_description || '',
-      proposed_activity_title: row.activity_title || '',
-      proposed_description: row.budget_item_description || '',
-      proposed_budget: toNumber(row.budget),
-      current_budget: toNumber(row.budget)
-    };
-  });
-  state.rowCounter += roundRows.length;
+  state.baselineCurrentTotal = roundRows.reduce(
+    (sum, row) => sum + toNumber(row.budget),
+    0
+  );
+
+  state.approvedActivitiesByProject = buildApprovedActivities(roundRows);
+  state.modificationProjects = buildModificationProjects(roundRows);
 
   hideSections();
   document
@@ -418,206 +399,394 @@ function showModificationView() {
   document.getElementById('modificationHeading').textContent =
     `Submit ${state.selectedRound} Budget Modification`;
 
-  renderModificationTable();
+  renderModificationProjects();
   updateModificationTotals();
 }
 
-function renderModificationTable() {
+function buildApprovedActivities(roundRows) {
+  const map = {};
+
+  state.budgetRows.forEach(row => {
+    const project = String(row.title || '').trim();
+    const activity = String(row.activity_title || '').trim();
+
+    if (!project || !activity) return;
+
+    if (!map[project]) {
+      map[project] = new Set();
+    }
+
+    map[project].add(activity);
+  });
+
+  roundRows.forEach(row => {
+    const project = String(row.title || '').trim();
+    const activity = String(row.activity_title || '').trim();
+
+    if (!project || !activity) return;
+
+    if (!map[project]) {
+      map[project] = new Set();
+    }
+
+    map[project].add(activity);
+  });
+
+  return Object.fromEntries(
+    Object.entries(map).map(([project, activities]) => {
+      return [project, Array.from(activities).sort((a, b) => a.localeCompare(b))];
+    })
+  );
+}
+
+function buildModificationProjects(roundRows) {
+  const projectMap = new Map();
+
+  // Grouping data as project -> activity -> object category allows one normalized editable row
+  // per activity/category while preserving source object-code context for payload submission.
+  roundRows.forEach(row => {
+    const projectName = String(row.title || 'Unassigned').trim();
+    const activityName = String(row.activity_title || 'Unassigned').trim();
+    const category = row.object_category || inferObjectCategory(row.object_code);
+
+    if (!projectMap.has(projectName)) {
+      projectMap.set(projectName, {
+        name: projectName,
+        activities: new Map()
+      });
+    }
+
+    const project = projectMap.get(projectName);
+
+    if (!project.activities.has(activityName)) {
+      project.activities.set(activityName, []);
+    }
+
+    project.activities.get(activityName).push({
+      object_category: category,
+      object_code: String(row.object_code || '').trim(),
+      current_budget: toNumber(row.budget),
+      current_budget_description: String(row.budget_item_description || '').trim()
+    });
+  });
+
+  return Array.from(projectMap.values())
+    .map(project => {
+      return {
+        name: project.name,
+        activities: Array.from(project.activities.entries())
+          .map(([activityName, sourceRows]) => {
+            const rowsByCategory = {};
+
+            sourceRows.forEach(sourceRow => {
+              const category = sourceRow.object_category;
+
+              if (!rowsByCategory[category]) {
+                rowsByCategory[category] = {
+                  object_category: category,
+                  object_code: sourceRow.object_code,
+                  current_budget: 0,
+                  current_budget_description: '',
+                  proposed_budget: 0,
+                  proposed_budget_description: '',
+                  modified: false
+                };
+              }
+
+              rowsByCategory[category].current_budget += sourceRow.current_budget;
+
+              if (!rowsByCategory[category].current_budget_description && sourceRow.current_budget_description) {
+                rowsByCategory[category].current_budget_description = sourceRow.current_budget_description;
+              }
+
+              if (!rowsByCategory[category].object_code && sourceRow.object_code) {
+                rowsByCategory[category].object_code = sourceRow.object_code;
+              }
+            });
+
+            const categoryRows = OBJECT_CATEGORIES.map(category => {
+              const existing = rowsByCategory[category];
+
+              if (existing) {
+                return {
+                  ...existing,
+                  proposed_budget: existing.current_budget,
+                  proposed_budget_description: existing.current_budget_description,
+                  modified: false
+                };
+              }
+
+              return {
+                object_category: category,
+                object_code: '',
+                current_budget: 0,
+                current_budget_description: '',
+                proposed_budget: 0,
+                proposed_budget_description: '',
+                modified: false
+              };
+            });
+
+            return {
+              name: activityName,
+              is_new_line: false,
+              categoryRows
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name))
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderModificationProjects() {
   const container = document.getElementById('modificationRows');
 
-  let html = `
-    <table>
-      <thead>
-        <tr>
-          <th>Project</th>
-          <th>Current Activity</th>
-          <th>Revised Activity</th>
-          <th>Current Details</th>
-          <th>Revised Details</th>
-          <th>Object Code</th>
-          <th class="money">Current Budget</th>
-          <th class="money">Proposed Budget</th>
-          <th>Delete Flag</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+  container.innerHTML = state.modificationProjects.map((project, projectIndex) => {
+    const existingActivities = new Set(project.activities.map(activity => activity.name));
+    const approvedActivities = state.approvedActivitiesByProject[project.name] || [];
+    const addableActivities = approvedActivities.filter(name => !existingActivities.has(name));
 
-  state.modificationRows.forEach((row, index) => {
-    const projectOptions = getProjectOptions();
-    const activityOptions = getActivityOptions(row.title);
+    const activitiesHtml = project.activities.length
+      ? project.activities.map((activity, activityIndex) => renderActivityCard(projectIndex, activityIndex, activity)).join('')
+      : '<p>No activities yet for this project. Add one below.</p>';
 
-    const changedRowClass = isRowChanged(row) ? 'changed-row' : '';
-    const deletedClass = row.is_deleted ? 'deleted-row' : '';
-
-    html += `
-      <tr class="${changedRowClass} ${deletedClass}" data-row-index="${index}">
-        <td>
-          ${row.is_new_line ? `
-            <select data-index="${index}" data-field="title">
-              ${projectOptions.map(option => `<option value="${escapeAttribute(option)}" ${option === row.title ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+    return `
+      <section class="project-section">
+        <h3 class="project-header">${escapeHtml(project.name)}</h3>
+        <div class="project-content">
+          ${activitiesHtml}
+          <div class="activity-controls">
+            <label for="add-activity-${projectIndex}">Add New Activity</label>
+            <select id="add-activity-${projectIndex}" data-project-index="${projectIndex}" data-action="activity-select">
+              <option value="">Select an activity</option>
+              ${addableActivities.map(activity => `<option value="${escapeAttribute(activity)}">${escapeHtml(activity)}</option>`).join('')}
             </select>
-          ` : escapeHtml(row.title)}
-        </td>
-        <td>${escapeHtml(row.activity_title)}</td>
+            <button class="button primary small-button" type="button" data-project-index="${projectIndex}" data-action="add-activity">+ Add New Activity</button>
+          </div>
+        </div>
+      </section>
+    `;
+  }).join('');
+}
+
+function renderActivityCard(projectIndex, activityIndex, activity) {
+  const rowsHtml = activity.categoryRows.map(row => {
+    const warningClass = row.proposed_budget > 0 && !String(row.proposed_budget_description || '').trim()
+      ? 'object-row-warning'
+      : '';
+
+    return `
+      <tr class="${row.modified ? 'changed-row' : ''} ${warningClass}" data-project-index="${projectIndex}" data-activity-index="${activityIndex}" data-category="${escapeAttribute(row.object_category)}">
         <td>
-          ${row.is_new_line ? `
-            <select data-index="${index}" data-field="proposed_activity_title">
-              <option value="">Select activity</option>
-              ${activityOptions.map(option => `<option value="${escapeAttribute(option)}" ${option === row.proposed_activity_title ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-            </select>
-          ` : `
-            <input type="text" data-index="${index}" data-field="proposed_activity_title" value="${escapeAttribute(row.proposed_activity_title)}" />
-          `}
-        </td>
-        <td>${escapeHtml(row.budget_item_description)}</td>
-        <td>
-          <textarea rows="3" data-index="${index}" data-field="proposed_description">${escapeHtml(row.proposed_description)}</textarea>
-        </td>
-        <td>
-          ${row.is_new_line ? `
-            <input type="text" data-index="${index}" data-field="object_code" value="${escapeAttribute(row.object_code)}" placeholder="Object code" />
-          ` : escapeHtml(row.object_code)}
+          ${row.modified ? '<span class="modified-indicator">●</span>' : ''}
+          ${escapeHtml(row.object_category)}
         </td>
         <td class="money">${formatCurrency(row.current_budget)}</td>
+        <td>${escapeHtml(row.current_budget_description || '—')}</td>
         <td>
-          <input class="amount-input" type="number" min="0" step="0.01" data-index="${index}" data-field="proposed_budget" value="${numberFormatter.format(row.proposed_budget)}" />
+          <input
+            type="number"
+            class="amount-input"
+            min="0"
+            step="0.01"
+            value="${toInputAmount(row.proposed_budget)}"
+            data-project-index="${projectIndex}"
+            data-activity-index="${activityIndex}"
+            data-category="${escapeAttribute(row.object_category)}"
+            data-field="proposed_budget"
+          />
         </td>
         <td>
-          ${row.is_new_line ? `
-            <button class="button danger small-button" type="button" data-index="${index}" data-action="remove_new">Remove</button>
-          ` : `
-            <label class="inline-checkbox">
-              <input type="checkbox" data-index="${index}" data-field="is_deleted" ${row.is_deleted ? 'checked' : ''} />
-              Mark for deletion
-            </label>
-          `}
+          <textarea
+            rows="2"
+            data-project-index="${projectIndex}"
+            data-activity-index="${activityIndex}"
+            data-category="${escapeAttribute(row.object_category)}"
+            data-field="proposed_budget_description"
+          >${escapeHtml(row.proposed_budget_description)}</textarea>
         </td>
       </tr>
     `;
-  });
+  }).join('');
 
-  html += '</tbody></table>';
-  container.innerHTML = html;
+  return `
+    <article class="activity-card" data-project-index="${projectIndex}" data-activity-index="${activityIndex}">
+      <div class="activity-header">
+        <h4>${escapeHtml(activity.name)}${activity.is_new_line ? ' <span class="flag flag-new">New Activity</span>' : ''}</h4>
+        <button class="button danger small-button" type="button" data-project-index="${projectIndex}" data-activity-index="${activityIndex}" data-action="delete-activity">Delete Activity</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Object Category</th>
+              <th class="money">Current Budget</th>
+              <th>Current Description</th>
+              <th class="money">Proposed Budget</th>
+              <th>Proposed Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
 }
 
-function handleModificationInput(event) {
+function handleModificationClick(event) {
+  const deleteButton = event.target.closest('[data-action="delete-activity"]');
+  if (deleteButton) {
+    const projectIndex = Number(deleteButton.dataset.projectIndex);
+    const activityIndex = Number(deleteButton.dataset.activityIndex);
+    deleteActivity(projectIndex, activityIndex);
+    return;
+  }
+
+  const addButton = event.target.closest('[data-action="add-activity"]');
+  if (addButton) {
+    const projectIndex = Number(addButton.dataset.projectIndex);
+    const select = document.getElementById(`add-activity-${projectIndex}`);
+    addActivity(projectIndex, select?.value || '');
+  }
+}
+
+function handleModificationChange(event) {
   const target = event.target;
-  const actionButton = target.closest('[data-action="remove_new"]');
 
-  if (actionButton) {
-    const index = Number(actionButton.dataset.index);
-    removeNewLine(index);
+  if (target.dataset.action === 'activity-select') {
     return;
   }
 
-  if (!target.dataset || target.dataset.index === undefined) {
+  if (!target.dataset || target.dataset.field === undefined) {
     return;
   }
 
-  const index = Number(target.dataset.index);
+  applyModificationFieldUpdate(target);
+}
+
+function handleModificationBlur(event) {
+  const target = event.target;
+
+  if (!target.dataset || target.dataset.field !== 'proposed_budget_description') {
+    return;
+  }
+
+  applyModificationFieldUpdate(target);
+}
+
+function applyModificationFieldUpdate(target) {
+  const projectIndex = Number(target.dataset.projectIndex);
+  const activityIndex = Number(target.dataset.activityIndex);
+  const category = target.dataset.category;
   const field = target.dataset.field;
-  const row = state.modificationRows[index];
 
+  const row = getCategoryRow(projectIndex, activityIndex, category);
   if (!row) return;
 
-  if (field === 'is_deleted') {
-    row.is_deleted = Boolean(target.checked);
-  } else if (field === 'proposed_budget') {
+  if (field === 'proposed_budget') {
     row.proposed_budget = toNumber(target.value);
-  } else {
-    row[field] = target.value;
+  } else if (field === 'proposed_budget_description') {
+    row.proposed_budget_description = String(target.value || '').trim();
   }
 
-  if (field === 'title' && row.is_new_line) {
-    row.proposed_activity_title = '';
-    renderModificationTable();
-  } else {
-    updateRowAppearance(index);
-  }
-
+  row.modified = isObjectRowModified(row);
+  updateCategoryRowAppearance(projectIndex, activityIndex, category);
   updateModificationTotals();
 }
 
-function addNewLine() {
-  const projectOptions = getProjectOptions();
+function deleteActivity(projectIndex, activityIndex) {
+  const project = state.modificationProjects[projectIndex];
+  if (!project) return;
 
-  if (!projectOptions.length) {
-    showMessage('No projects are available for this round.', 'error');
+  project.activities.splice(activityIndex, 1);
+  renderModificationProjects();
+  updateModificationTotals();
+}
+
+function addActivity(projectIndex, activityName) {
+  const project = state.modificationProjects[projectIndex];
+  if (!project) return;
+
+  const selectedName = String(activityName || '').trim();
+  if (!selectedName) {
+    showMessage('Select an activity to add.', 'error');
     return;
   }
 
-  state.rowCounter += 1;
-  state.modificationRows.push({
-    rowId: `new-${state.rowCounter}`,
-    is_new_line: true,
-    is_deleted: false,
-    round: state.selectedRound,
-    title: projectOptions[0],
-    activity_title: '(new line)',
-    object_code: '',
-    budget_item_description: '',
-    proposed_activity_title: '',
-    proposed_description: '',
-    proposed_budget: 0,
-    current_budget: 0
-  });
+  const alreadyExists = project.activities.some(activity => activity.name === selectedName);
 
-  renderModificationTable();
-  updateModificationTotals();
-}
-
-function removeNewLine(index) {
-  const row = state.modificationRows[index];
-
-  if (!row || !row.is_new_line) return;
-
-  state.modificationRows.splice(index, 1);
-  renderModificationTable();
-  updateModificationTotals();
-}
-
-function updateRowAppearance(index) {
-  const rowElement = document.querySelector(
-    `tr[data-row-index="${index}"]`
-  );
-
-  if (!rowElement) return;
-
-  const row = state.modificationRows[index];
-
-  rowElement.classList.toggle('changed-row', isRowChanged(row));
-  rowElement.classList.toggle('deleted-row', row.is_deleted);
-}
-
-function isRowChanged(row) {
-  if (row.is_new_line) {
-    return true;
+  if (alreadyExists) {
+    showMessage(`Activity ${selectedName} is already added for project ${project.name}.`, 'error');
+    return;
   }
 
-  return (
-    row.is_deleted ||
-    (row.proposed_activity_title || '').trim() !==
-      (row.activity_title || '').trim() ||
-    (row.proposed_description || '').trim() !==
-      (row.budget_item_description || '').trim() ||
-    Math.abs(toNumber(row.proposed_budget) - toNumber(row.current_budget)) >=
-      0.005
+  const categoryRows = OBJECT_CATEGORIES.map(category => ({
+    object_category: category,
+    object_code: '',
+    current_budget: 0,
+    current_budget_description: '',
+    proposed_budget: 0,
+    proposed_budget_description: '',
+    modified: false
+  }));
+
+  project.activities.push({
+    name: selectedName,
+    is_new_line: true,
+    categoryRows
+  });
+
+  project.activities.sort((a, b) => a.name.localeCompare(b.name));
+  renderModificationProjects();
+  updateModificationTotals();
+}
+
+function updateCategoryRowAppearance(projectIndex, activityIndex, category) {
+  const rowElement = document.querySelector(
+    `tr[data-project-index="${projectIndex}"][data-activity-index="${activityIndex}"][data-category="${cssEscape(category)}"]`
   );
+
+  const row = getCategoryRow(projectIndex, activityIndex, category);
+
+  if (!rowElement || !row) return;
+
+  rowElement.classList.toggle('changed-row', row.modified);
+
+  const requiresDescription = row.proposed_budget > 0 && !String(row.proposed_budget_description || '').trim();
+  rowElement.classList.toggle('object-row-warning', requiresDescription);
+
+  const indicatorCell = rowElement.querySelector('td:first-child');
+  if (indicatorCell) {
+    indicatorCell.innerHTML = `${row.modified ? '<span class="modified-indicator">●</span>' : ''}${escapeHtml(row.object_category)}`;
+  }
+}
+
+function getCategoryRow(projectIndex, activityIndex, category) {
+  const project = state.modificationProjects[projectIndex];
+  if (!project) return null;
+
+  const activity = project.activities[activityIndex];
+  if (!activity) return null;
+
+  return activity.categoryRows.find(row => row.object_category === category) || null;
+}
+
+function isObjectRowModified(row) {
+  const budgetChanged = Math.abs(toNumber(row.proposed_budget) - toNumber(row.current_budget)) >= 0.005;
+  const descriptionChanged = String(row.proposed_budget_description || '').trim() !== String(row.current_budget_description || '').trim();
+
+  return budgetChanged || descriptionChanged;
 }
 
 function updateModificationTotals() {
-  const currentTotal = state.modificationRows
-    .filter(row => !row.is_new_line)
-    .reduce((total, row) => total + toNumber(row.current_budget), 0);
-
-  const proposedTotal = state.modificationRows.reduce((total, row) => {
-    if (row.is_deleted) {
-      return total;
-    }
-
-    return total + toNumber(row.proposed_budget);
-  }, 0);
+  const currentTotal = state.baselineCurrentTotal;
+  const proposedTotal = getFlattenedModifications().reduce(
+    (sum, row) => sum + toNumber(row.proposed_budget),
+    0
+  );
 
   const difference = proposedTotal - currentTotal;
   const valid = Math.abs(difference) < 0.005;
@@ -629,33 +798,15 @@ function updateModificationTotals() {
 
   const differenceElement = document.getElementById('totalDifference');
   differenceElement.textContent = formatCurrency(difference);
-  differenceElement.className = valid ? 'difference-valid' : 'difference-invalid';
+  differenceElement.className = valid
+    ? 'difference-valid'
+    : 'difference-invalid';
 
   document.getElementById('submitButton').disabled = !valid;
 }
 
 async function submitModification(event) {
   event.preventDefault();
-
-  const currentTotal = state.modificationRows
-    .filter(row => !row.is_new_line)
-    .reduce((total, row) => total + toNumber(row.current_budget), 0);
-
-  const proposedTotal = state.modificationRows.reduce((total, row) => {
-    if (row.is_deleted) {
-      return total;
-    }
-
-    return total + toNumber(row.proposed_budget);
-  }, 0);
-
-  if (Math.abs(currentTotal - proposedTotal) >= 0.005) {
-    showMessage(
-      'The proposed budget must equal the current round budget total.',
-      'error'
-    );
-    return;
-  }
 
   const requesterName =
     document.getElementById('requesterName').value.trim();
@@ -669,24 +820,11 @@ async function submitModification(event) {
     return;
   }
 
-  const incompleteNewRows = state.modificationRows.filter(
-    row =>
-      row.is_new_line &&
-      !row.is_deleted &&
-      (
-        !String(row.title || '').trim() ||
-        !String(row.proposed_activity_title || '').trim() ||
-        !String(row.object_code || '').trim() ||
-        !String(row.proposed_description || '').trim() ||
-        toNumber(row.proposed_budget) <= 0
-      )
-  );
+  const flattened = getFlattenedModifications();
+  const validationErrors = validateModifications(flattened);
 
-  if (incompleteNewRows.length > 0) {
-    showMessage(
-      'Each new budget line must include project, activity, object code, revised details, and an amount greater than $0.00.',
-      'error'
-    );
+  if (validationErrors.length) {
+    showMessage(validationErrors[0], 'error');
     return;
   }
 
@@ -709,18 +847,17 @@ async function submitModification(event) {
           requesterEmail,
           justification,
           round: state.selectedRound,
-          modifications: state.modificationRows.map(row => ({
+          modifications: flattened.map(row => ({
             title: row.title,
             activity_title: row.activity_title,
-            proposed_activity_title: row.proposed_activity_title,
-            budget_item_description: row.budget_item_description,
+            object_category: row.object_category,
             object_code: row.object_code,
             current_budget: toNumber(row.current_budget),
-            proposed_budget: row.is_deleted ? 0 : toNumber(row.proposed_budget),
-            current_expenditure: 0,
-            proposed_description: row.proposed_description,
-            is_deleted: Boolean(row.is_deleted),
+            current_budget_description: row.current_budget_description,
+            proposed_budget: toNumber(row.proposed_budget),
+            proposed_budget_description: row.proposed_budget_description,
             is_new_line: Boolean(row.is_new_line),
+            activity_status: row.activity_status,
             round: state.selectedRound
           }))
         })
@@ -740,7 +877,7 @@ async function submitModification(event) {
       'success'
     );
 
-    state.modificationRows = [];
+    state.modificationProjects = [];
     showRoundDetailView();
   } catch (error) {
     showMessage(
@@ -752,31 +889,81 @@ async function submitModification(event) {
   }
 }
 
+function validateModifications(flattened) {
+  const errors = [];
+
+  const byActivity = flattened.reduce((groups, row) => {
+    const key = `${row.title}||${row.activity_title}`;
+
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+
+    groups[key].push(row);
+    return groups;
+  }, {});
+
+  Object.values(byActivity).forEach(activityRows => {
+    const sample = activityRows[0];
+    const hasBudgetedCategory = activityRows.some(
+      row => toNumber(row.proposed_budget) > 0
+    );
+
+    if (!hasBudgetedCategory) {
+      errors.push(
+        `Activity ${sample.activity_title} must have at least one budgeted object category.`
+      );
+    }
+  });
+
+  flattened.forEach(row => {
+    if (
+      toNumber(row.proposed_budget) > 0 &&
+      !String(row.proposed_budget_description || '').trim()
+    ) {
+      errors.push(
+        `Description required for ${row.activity_title} - ${row.object_category}.`
+      );
+    }
+  });
+
+  const proposedTotal = flattened.reduce(
+    (sum, row) => sum + toNumber(row.proposed_budget),
+    0
+  );
+
+  if (Math.abs(proposedTotal - state.baselineCurrentTotal) >= 0.005) {
+    errors.push(
+      'The proposed budget must equal the current round budget total.'
+    );
+  }
+
+  return errors;
+}
+
+function getFlattenedModifications() {
+  return state.modificationProjects.flatMap(project => {
+    return project.activities.flatMap(activity => {
+      return activity.categoryRows.map(row => ({
+        title: project.name,
+        activity_title: activity.name,
+        object_category: row.object_category,
+        object_code: row.object_code,
+        current_budget: row.current_budget,
+        current_budget_description: row.current_budget_description,
+        proposed_budget: row.proposed_budget,
+        proposed_budget_description: row.proposed_budget_description,
+        is_new_line: activity.is_new_line,
+        activity_status: 'active'
+      }));
+    });
+  });
+}
+
 function getRowsForRound(round) {
   return state.budgetRows.filter(
     row => row.inferred_round === round && state.visibleRounds.includes(round)
   );
-}
-
-function getProjectOptions() {
-  const projects = new Set(
-    getRowsForRound(state.selectedRound)
-      .map(row => row.title)
-      .filter(Boolean)
-  );
-
-  return Array.from(projects).sort((a, b) => a.localeCompare(b));
-}
-
-function getActivityOptions(projectTitle) {
-  const activities = new Set(
-    getRowsForRound(state.selectedRound)
-      .filter(row => row.title === projectTitle)
-      .map(row => row.activity_title)
-      .filter(Boolean)
-  );
-
-  return Array.from(activities).sort((a, b) => a.localeCompare(b));
 }
 
 function groupByProject(rows) {
@@ -836,10 +1023,6 @@ function getRoundIdentifier(row) {
   );
 }
 
-function inferRound(value) {
-  return normalizeRoundToken(value) || '';
-}
-
 function normalizeRoundToken(value) {
   const match = String(value || '').match(/\bR\s*(\d+)\b/i);
   if (!match) return '';
@@ -857,6 +1040,20 @@ function normalizeRoundList(list) {
     .filter(Boolean);
 
   return Array.from(new Set(rounds)).sort(sortRound);
+}
+
+function inferObjectCategory(objectCode) {
+  const codeText = String(objectCode || '').trim();
+  const digits = codeText.replace(/[^0-9]/g, '');
+
+  if (!digits) return '6000s';
+
+  const leading = Number(digits[0]);
+  if (leading >= 1 && leading <= 6) {
+    return `${leading}000s`;
+  }
+
+  return '6000s';
 }
 
 function sortRound(a, b) {
@@ -891,6 +1088,10 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function toInputAmount(value) {
+  return Number(toNumber(value).toFixed(2));
+}
+
 function formatCurrency(value) {
   return currencyFormatter.format(toNumber(value));
 }
@@ -906,6 +1107,14 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value);
+}
+
+function cssEscape(value) {
+  if (window.CSS && typeof window.CSS.escape === 'function') {
+    return window.CSS.escape(String(value || ''));
+  }
+
+  return String(value || '').replace(/(["'\\#.:\[\]\(\)\s])/g, '\\$1');
 }
 
 function showMessage(message, type) {

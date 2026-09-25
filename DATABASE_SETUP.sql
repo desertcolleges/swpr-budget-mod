@@ -1,4 +1,4 @@
--- IEDRC Budget Modification: round workflow + status portal setup
+-- IEDRC Budget Modification: normalized object-category workflow + status portal setup
 -- Run in Supabase SQL editor. Safe to re-run.
 
 create extension if not exists pgcrypto;
@@ -14,16 +14,32 @@ values (1, array['R10']::text[])
 on conflict (id) do nothing;
 
 alter table public.submission_modifications
-  add column if not exists is_deleted boolean not null default false,
-  add column if not exists is_new_line boolean not null default false,
   add column if not exists round text,
-  add column if not exists proposed_activity_title text;
+  add column if not exists title text,
+  add column if not exists activity_title text,
+  add column if not exists object_category text,
+  add column if not exists object_code text,
+  add column if not exists current_budget numeric,
+  add column if not exists proposed_budget numeric,
+  add column if not exists current_budget_description text,
+  add column if not exists proposed_budget_description text,
+  add column if not exists activity_status text,
+  add column if not exists is_new_line boolean not null default false;
+
+-- Legacy compatibility columns (used by existing data and older requests)
+alter table public.submission_modifications
+  add column if not exists budget_item_description text,
+  add column if not exists proposed_description text;
+
+create index if not exists idx_submission_mod_submission_project_activity
+  on public.submission_modifications (submission_id, title, activity_title);
+
+-- One row per submission + project + activity + object category
+create unique index if not exists uq_submission_mod_project_activity_category
+  on public.submission_modifications (submission_id, title, activity_title, object_category);
 
 alter table public.budget_submissions
-  add column if not exists round text;
-
-
-alter table public.budget_submissions
+  add column if not exists round text,
   add column if not exists status_access_token text;
 
 create table if not exists public.activity_management (
@@ -114,11 +130,9 @@ with check (
   )
 );
 
--- Secure requester status lookup: requires request number + requester email, and validates token when provided.
+-- Request status lookup by request number (semi-public).
 create or replace function public.get_request_status(
-  p_request_number text,
-  p_requester_email text default null,
-  p_status_token text default null
+  p_request_number text
 )
 returns table (
   submission_id uuid,
@@ -134,13 +148,12 @@ returns table (
   reviewed_at timestamptz,
   title text,
   activity_title text,
-  proposed_activity_title text,
+  object_category text,
   object_code text,
-  budget_item_description text,
-  proposed_description text,
+  current_budget_description text,
+  proposed_budget_description text,
   current_budget numeric,
   proposed_budget numeric,
-  is_deleted boolean,
   is_new_line boolean,
   modification_round text
 )
@@ -162,34 +175,19 @@ as $$
     bs.reviewed_at,
     sm.title,
     sm.activity_title,
-    sm.proposed_activity_title,
+    sm.object_category,
     sm.object_code,
-    sm.budget_item_description,
-    sm.proposed_description,
+    coalesce(sm.current_budget_description, sm.budget_item_description) as current_budget_description,
+    coalesce(sm.proposed_budget_description, sm.proposed_description) as proposed_budget_description,
     sm.current_budget,
     sm.proposed_budget,
-    sm.is_deleted,
     sm.is_new_line,
     sm.round as modification_round
   from public.budget_submissions bs
   left join public.submission_modifications sm
     on sm.submission_id = bs.id
-  where lower(bs.request_number) = lower(trim(p_request_number))
-    and (
-      (
-        p_status_token is not null
-        and p_status_token <> ''
-        and bs.status_access_token = p_status_token
-      )
-      or
-      (
-        coalesce(trim(bs.status_access_token), '') = ''
-        and
-        p_requester_email is not null
-        and lower(bs.requester_email) = lower(trim(p_requester_email))
-      )
-    );
+  where lower(bs.request_number) = lower(trim(p_request_number));
 $$;
 
-revoke all on function public.get_request_status(text, text, text) from public;
-grant execute on function public.get_request_status(text, text, text) to anon, authenticated;
+revoke all on function public.get_request_status(text) from public;
+grant execute on function public.get_request_status(text) to anon, authenticated;

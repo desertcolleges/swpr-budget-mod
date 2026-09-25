@@ -10,7 +10,11 @@
     <main class="container">
       <header class="page-header branded-header">
         <div class="brand-lockup">
-          <div class="brand-mark" aria-hidden="true">IEDRC</div>
+          <img
+            class="brand-logo"
+            src="images/iedrc-logo.svg"
+            alt="IEDRC logo"
+          />
           <div>
             <h1>Request Status Portal</h1>
             <p>Look up a submitted budget modification request.</p>
@@ -31,13 +35,6 @@
               <label for="requestNumberInput">Request Number *</label>
               <input id="requestNumberInput" type="text" required placeholder="REQ-..." />
             </div>
-            <div>
-              <label for="requesterEmailInput">Requester Email</label>
-              <input id="requesterEmailInput" type="email" placeholder="name@example.edu" />
-              <small class="hint-text">
-                Required for manual lookup. Optional when using a secure emailed token link.
-              </small>
-            </div>
           </div>
           <button class="button primary" type="submit">Lookup Request</button>
         </form>
@@ -46,7 +43,7 @@
       <section id="statusResultSection" class="hidden">
         <div class="section-header no-print">
           <h2 id="statusRequestHeading"></h2>
-          <button id="printRecordButton" class="button secondary" type="button">Print / Save PDF</button>
+          <button id="printRecordButton" class="button secondary" type="button">Download PDF</button>
         </div>
 
         <article id="statusRecord" class="card printable-record">

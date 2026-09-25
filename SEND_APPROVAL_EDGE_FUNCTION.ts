@@ -51,25 +51,25 @@ serve(async (req) => {
       : "";
     const statusLink = `${appBaseUrl}/status.html?requestId=${encodeURIComponent(request_number)}${tokenQuery}`;
     const subject = action === "Approved"
-      ? `Budget Request Approved: ${request_number}`
-      : `Budget Request Rejected: ${request_number}`;
+      ? `Your request ${request_number} has been approved`
+      : `Your request ${request_number} has been rejected`;
 
     const escapedRequest = escapeHtml(request_number);
     const escapedNotes = escapeHtml(notes || "No rejection reason provided.");
 
     const htmlBody = action === "Approved"
       ? `
-        <h2>Budget Request Approved</h2>
-        <p>Your budget modification request <strong>${escapedRequest}</strong> has been approved.</p>
+        <h2>Request Approved</h2>
+        <p>Your request <strong>${escapedRequest}</strong> has been approved.</p>
         <p><a href="${statusLink}">View Request Status Record</a></p>
-        <p>You can print or save the status record from the portal.</p>
+        <p>You can print or save the status record from the portal using your browser print dialog.</p>
       `
       : `
-        <h2>Budget Request Rejected</h2>
-        <p>Your budget modification request <strong>${escapedRequest}</strong> has been rejected.</p>
+        <h2>Request Rejected</h2>
+        <p>Your request <strong>${escapedRequest}</strong> has been rejected.</p>
         <p><strong>Reason:</strong> ${escapedNotes}</p>
         <p><a href="${statusLink}">View Request Status Record</a></p>
-        <p>This rejection notification does not include a PDF attachment.</p>
+        <p>This notification does not include a PDF attachment; use the portal print dialog to save a PDF.</p>
       `;
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
