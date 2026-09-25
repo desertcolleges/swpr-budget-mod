@@ -406,19 +406,7 @@ function showModificationView() {
 function buildApprovedActivities(roundRows) {
   const map = {};
 
-  state.budgetRows.forEach(row => {
-    const project = String(row.title || '').trim();
-    const activity = String(row.activity_title || '').trim();
-
-    if (!project || !activity) return;
-
-    if (!map[project]) {
-      map[project] = new Set();
-    }
-
-    map[project].add(activity);
-  });
-
+  // Keep activity options scoped to the selected round to prevent cross-round transfers.
   roundRows.forEach(row => {
     const project = String(row.title || '').trim();
     const activity = String(row.activity_title || '').trim();

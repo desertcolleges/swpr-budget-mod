@@ -176,7 +176,7 @@ function renderModificationTable() {
         <td>${escapeHtml(row.current_budget_description || '—')}</td>
         <td class="money">${formatCurrency(row.proposed_budget)}</td>
         <td>${escapeHtml(row.proposed_budget_description || '—')}</td>
-        <td>${row.is_new_line ? '<span class="flag flag-new">true</span>' : 'false'}</td>
+        <td>${row.is_new_line ? '<span class="flag flag-new">Yes</span>' : 'No'}</td>
       </tr>
     `;
   });

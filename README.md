@@ -9,6 +9,7 @@ Budget modification request tool for Regional Strong Workforce.
 - Activity deletion removes all six object-category rows from local state and excludes the activity from submission payload.
 - New activity creation adds six object-category rows immediately with `$0` and blank proposed descriptions.
 - Request status lookup supports direct deep links with `status.html?requestId=REQ-XXXXX` and manual request-number lookup.
+- Status lookup is intentionally request-number based (semi-public access model); request numbers should be treated as non-secret identifiers.
 - Status page PDF export currently uses browser print dialog via **Download PDF**.
 - Email function source is in `SEND_APPROVAL_EDGE_FUNCTION.ts`; deploy it as Supabase Edge Function `send-approval`.
 - Apply `DATABASE_SETUP.sql` in Supabase SQL Editor to provision normalized submission modification fields, indexes, and status lookup RPC.
