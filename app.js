@@ -1,5 +1,5 @@
-const SUPABASE_URL = 'https://dfghvbhidpzxjdcczcck.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_IXoPGcfK7o5LbccQvk6g9g_cWbtfrH2';
+const SUPABASE_URL = 'https://YOUR_PROJECT_REF.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_PUBLIC_ANON_KEY';
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -47,31 +47,31 @@ async function loadInstitutions() {
   try {
     showLoading(true);
 
-    const { data, error } = await supabaseClient
-      .from('budget_reference')
-      .select('institution')
-      .order('institution');
+    const { data, error } = await supabaseClient.rpc(
+      'get_public_institutions'
+    );
 
     if (error) throw error;
 
-    const institutions = [
-      ...new Set(
-        data
-          .map(row => row.institution)
-          .filter(Boolean)
-      )
-    ];
-
     const select = document.getElementById('institutionSelect');
 
-    select.innerHTML = '<option value="">Select an institution</option>';
+    select.innerHTML =
+      '<option value="">Select an institution</option>';
 
-    institutions.forEach(institution => {
+    (data || []).forEach(row => {
+      const institution = row.institution;
+
       const option = document.createElement('option');
       option.value = institution;
       option.textContent = institution;
+
       select.appendChild(option);
     });
+
+    if (!data || data.length === 0) {
+      select.innerHTML =
+        '<option value="">No institutions found</option>';
+    }
   } catch (error) {
     showMessage(
       'Unable to load institutions: ' + error.message,
@@ -208,63 +208,52 @@ function renderBudgetTable() {
         <tbody>
   `;
 
-  Object.entries(groupedBudget).forEach(
-    ([project, rows]) => {
-      const projectBudget = rows.reduce(
-        (total, row) => total + toNumber(row.budget),
-        0
-      );
+  Object.entries(groupedBudget).forEach(([project, rows]) => {
+    const projectBudget = rows.reduce(
+      (total, row) => total + toNumber(row.budget),
+      0
+    );
 
-      const projectExpenditures = rows.reduce(
-        (total, row) =>
-          total +
-          getExpenditureForBudgetRow(
-            row,
-            groupedExpenditures
-          ),
-        0
+    const projectExpenditures = rows.reduce(
+      (total, row) =>
+        total +
+        getExpenditureForBudgetRow(row, groupedExpenditures),
+      0
+    );
+
+    html += `
+      <tr class="project-row">
+        <td colspan="4">${escapeHtml(project)}</td>
+        <td class="money">${formatCurrency(projectBudget)}</td>
+        <td class="money">${formatCurrency(projectExpenditures)}</td>
+        <td class="money">
+          ${formatCurrency(projectBudget - projectExpenditures)}
+        </td>
+      </tr>
+    `;
+
+    rows.forEach(row => {
+      const budget = toNumber(row.budget);
+      const expenditures = getExpenditureForBudgetRow(
+        row,
+        groupedExpenditures
       );
 
       html += `
-        <tr class="project-row">
-          <td colspan="4">${escapeHtml(project)}</td>
-          <td class="money">${formatCurrency(projectBudget)}</td>
+        <tr>
+          <td>${escapeHtml(row.title)}</td>
+          <td>${escapeHtml(row.activity_title)}</td>
+          <td>${escapeHtml(row.budget_item_description)}</td>
+          <td>${escapeHtml(row.object_code)}</td>
+          <td class="money">${formatCurrency(budget)}</td>
+          <td class="money">${formatCurrency(expenditures)}</td>
           <td class="money">
-            ${formatCurrency(projectExpenditures)}
-          </td>
-          <td class="money">
-            ${formatCurrency(projectBudget - projectExpenditures)}
+            ${formatCurrency(budget - expenditures)}
           </td>
         </tr>
       `;
-
-      rows.forEach(row => {
-        const budget = toNumber(row.budget);
-        const expenditures = getExpenditureForBudgetRow(
-          row,
-          groupedExpenditures
-        );
-
-        html += `
-          <tr>
-            <td>${escapeHtml(row.title)}</td>
-            <td>${escapeHtml(row.activity_title)}</td>
-            <td>
-              ${escapeHtml(row.budget_item_description)}
-            </td>
-            <td>${escapeHtml(row.object_code)}</td>
-            <td class="money">${formatCurrency(budget)}</td>
-            <td class="money">
-              ${formatCurrency(expenditures)}
-            </td>
-            <td class="money">
-              ${formatCurrency(budget - expenditures)}
-            </td>
-          </tr>
-        `;
-      });
-    }
-  );
+    });
+  });
 
   html += `
         </tbody>
@@ -337,9 +326,7 @@ function renderModificationTable() {
         <td>${escapeHtml(row.activity_title)}</td>
         <td>${escapeHtml(row.object_code)}</td>
         <td>${escapeHtml(row.budget_item_description)}</td>
-        <td class="money">
-          ${formatCurrency(row.budget)}
-        </td>
+        <td class="money">${formatCurrency(row.budget)}</td>
         <td>
           <input
             type="text"
@@ -467,53 +454,47 @@ async function submitModification(event) {
     showLoading(true);
     clearMessage();
 
-    const requestNumber =
-      'REQ-' +
-      crypto.randomUUID()
-        .replaceAll('-', '')
-        .substring(0, 8)
-        .toUpperCase();
-
-    const { data: submission, error: submissionError } =
-      await supabaseClient
-        .from('budget_submissions')
-        .insert({
-          request_number: requestNumber,
-          requester_name: requesterName,
-          requester_email: requesterEmail,
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/submit-budget`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
           institution: state.institution,
+          requesterName: requesterName,
+          requesterEmail: requesterEmail,
           justification: justification,
-          status: 'Pending'
+          modifications: state.modificationRows.map(row => ({
+            title: row.title,
+            activity_title: row.activity_title,
+            budget_item_description:
+              row.budget_item_description,
+            object_code: row.object_code,
+            current_budget: toNumber(row.budget),
+            proposed_budget: toNumber(row.proposed_budget),
+            current_expenditure: 0,
+            proposed_description: row.proposed_description
+          }))
         })
-        .select()
-        .single();
+      }
+    );
 
-    if (submissionError) throw submissionError;
+    const result = await response.json();
 
-    const modifications = state.modificationRows.map(row => ({
-      submission_id: submission.id,
-      title: row.title,
-      activity_title: row.activity_title,
-      budget_item_description:
-        row.budget_item_description,
-      object_code: row.object_code,
-      current_budget: toNumber(row.budget),
-      proposed_budget: toNumber(row.proposed_budget),
-      current_expenditure: 0,
-      proposed_description: row.proposed_description
-    }));
-
-    const { error: modificationError } =
-      await supabaseClient
-        .from('submission_modifications')
-        .insert(modifications);
-
-    if (modificationError) throw modificationError;
+    if (!response.ok) {
+      throw new Error(
+        result.error || 'Unable to submit request.'
+      );
+    }
 
     document.getElementById('submissionForm').reset();
 
     showMessage(
-      `Request ${requestNumber} was submitted successfully.`,
+      `Request ${result.request_number} was submitted successfully.`,
       'success'
     );
 
@@ -607,11 +588,6 @@ function showMessage(message, type) {
       ${escapeHtml(message)}
     </div>
   `;
-
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  });
 }
 
 function clearMessage() {
