@@ -150,7 +150,7 @@ function renderModificationTable() {
           <th>Current Description</th>
           <th>Proposed Budget</th>
           <th>Proposed Description</th>
-          <th>is_new_line</th>
+          <th>New Activity</th>
         </tr>
       </thead>
       <tbody>

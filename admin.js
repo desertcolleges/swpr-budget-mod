@@ -426,7 +426,7 @@ function renderModificationDetails() {
         <td class="money">${formatCurrency(row.current_budget)}</td>
         <td class="money">${formatCurrency(row.proposed_budget)}</td>
         <td>
-          ${isNew ? '<span class="flag flag-new">is_new_line=true</span>' : '<span class="flag">is_new_line=false</span>'}
+          ${isNew ? '<span class="flag flag-new">New Activity</span>' : '<span class="flag">Existing Activity</span>'}
         </td>
       </tr>
     `;

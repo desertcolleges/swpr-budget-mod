@@ -725,7 +725,7 @@ function addActivity(projectIndex, activityName) {
 
   const categoryRows = OBJECT_CATEGORIES.map(category => ({
     object_category: category,
-    object_code: '',
+    object_code: category.replace('s', ''),
     current_budget: 0,
     current_budget_description: '',
     proposed_budget: 0,
@@ -851,7 +851,7 @@ async function submitModification(event) {
             title: row.title,
             activity_title: row.activity_title,
             object_category: row.object_category,
-            object_code: row.object_code,
+            object_code: row.object_code || row.object_category.replace('s', ''),
             current_budget: toNumber(row.current_budget),
             current_budget_description: row.current_budget_description,
             proposed_budget: toNumber(row.proposed_budget),
