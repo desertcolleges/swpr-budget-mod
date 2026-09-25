@@ -164,7 +164,7 @@ async function loadSelectedInstitution() {
 
     state.budgetRows = (budgetResult.data || []).map(row => ({
       ...row,
-      inferred_round: inferRound(row.title)
+      inferred_round: getRoundIdentifier(row)
     }));
 
     state.expenditureRows = expenditureResult.data || [];
@@ -787,7 +787,7 @@ function groupByProject(rows) {
 
 function groupExpenditures(rows, round) {
   return rows.reduce((groups, row) => {
-    if (inferRound(row.project) !== round) {
+    if (getRoundIdentifier(row) !== round) {
       return groups;
     }
 
@@ -809,7 +809,31 @@ function getExpenditureForBudgetRow(row, groupedExpenditures) {
   return groupedExpenditures[key] || 0;
 }
 
+function getRoundIdentifier(row) {
+  const explicitRound =
+    row?.round ||
+    row?.round_name ||
+    row?.funding_round ||
+    row?.grant_round ||
+    '';
+
+  const normalizedExplicit = normalizeRoundToken(explicitRound);
+  if (normalizedExplicit) {
+    return normalizedExplicit;
+  }
+
+  return (
+    normalizeRoundToken(row?.title) ||
+    normalizeRoundToken(row?.project) ||
+    ''
+  );
+}
+
 function inferRound(value) {
+  return normalizeRoundToken(value) || '';
+}
+
+function normalizeRoundToken(value) {
   const match = String(value || '').match(/\bR\s*(\d+)\b/i);
   if (!match) return '';
   return `R${Number(match[1])}`;

@@ -137,13 +137,14 @@ function renderStatusRecord() {
     `Request ${request.request_number}`;
 
   const summary = document.getElementById('requestSummary');
+  const statusClass = getStatusClass(request.status);
   summary.innerHTML = `
     <div class="record-grid">
       <p><strong>Requester:</strong> ${escapeHtml(request.requester_name || '')}</p>
       <p><strong>Email:</strong> ${escapeHtml(request.requester_email || '')}</p>
       <p><strong>Institution:</strong> ${escapeHtml(request.institution || '')}</p>
       <p><strong>Round:</strong> ${escapeHtml(request.round || 'Unknown')}</p>
-      <p><strong>Status:</strong> <span class="status-badge status-${String(request.status || '').toLowerCase()}">${escapeHtml(request.status || '')}</span></p>
+      <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${escapeHtml(request.status || '')}</span></p>
       <p><strong>Submitted:</strong> ${formatDate(request.created_at)}</p>
       <p><strong>Reviewed:</strong> ${formatDate(request.reviewed_at)}</p>
     </div>
@@ -229,6 +230,15 @@ function renderResubmissionBlock() {
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString();
+}
+
+function getStatusClass(status) {
+  const normalized = String(status || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+
+  return `status-${normalized || 'pending'}`;
 }
 
 function toNumber(value) {

@@ -183,6 +183,8 @@ as $$
       )
       or
       (
+        coalesce(trim(bs.status_access_token), '') = ''
+        and
         p_requester_email is not null
         and lower(bs.requester_email) = lower(trim(p_requester_email))
       )
