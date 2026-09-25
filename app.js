@@ -963,7 +963,6 @@ function getFlattenedModifications() {
 function hasMeaningfulChanges() {
   return state.modificationProjects.some(project => {
     return project.activities.some(activity => {
-      if (activity.is_new_line) return true;
       return activity.categoryRows.some(row => isObjectRowModified(row));
     });
   });
