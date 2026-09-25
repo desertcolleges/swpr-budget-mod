@@ -9,9 +9,12 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+const ALL_ROUNDS = Array.from({ length: 12 }, (_, index) => `R${index + 1}`);
+
 const state = {
   requests: [],
-  selectedRequest: null
+  selectedRequest: null,
+  visibleRounds: ['R10']
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -39,6 +42,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     .getElementById('rejectButton')
     .addEventListener('click', () => processRequest('Rejected'));
 
+  document
+    .getElementById('roundSettingsForm')
+    .addEventListener('submit', saveRoundSettings);
+
+  renderRoundSettings();
   await loadExistingSession();
 });
 
@@ -47,17 +55,12 @@ async function loadExistingSession() {
     await supabaseClient.auth.getSession();
 
   if (error) {
-    console.error('getSession error:', error);
     showMessage(error.message, 'error');
     return;
   }
 
   if (data.session) {
-    console.log('Existing session found:', data.session.user.id);
-
     const isAuthorized = await isAdminUser(data.session.user.id);
-
-    console.log('Admin authorized?:', isAuthorized);
 
     if (!isAuthorized) {
       await supabaseClient.auth.signOut();
@@ -80,10 +83,7 @@ async function isAdminUser(userId) {
     .eq('active', true)
     .limit(1);
 
-  console.log('isAdminUser query result:', { userId, data, error });
-
   if (error) {
-    console.error('Admin check failed:', error);
     return false;
   }
 
@@ -111,11 +111,7 @@ async function signIn(event) {
 
     if (error) throw error;
 
-    console.log('Signed in user:', data.user.id);
-
     const isAuthorized = await isAdminUser(data.user.id);
-
-    console.log('isAuthorized:', isAuthorized);
 
     if (!isAuthorized) {
       await supabaseClient.auth.signOut();
@@ -126,7 +122,6 @@ async function signIn(event) {
 
     await showAdminDashboard(data.session);
   } catch (error) {
-    console.error('Sign in failed:', error);
     showMessage(
       'Unable to sign in: ' + error.message,
       'error'
@@ -152,7 +147,11 @@ async function showAdminDashboard(session) {
   document.getElementById('signedInUser').textContent =
     `Signed in as ${session.user.email}`;
 
-  await loadRequests();
+  await Promise.all([
+    loadRequests(),
+    loadRoundSettings(),
+    loadActivityManagementPlaceholder()
+  ]);
 }
 
 async function loadRequests() {
@@ -168,6 +167,8 @@ async function loadRequests() {
         requester_name,
         requester_email,
         institution,
+        round,
+        status_access_token,
         justification,
         status,
         admin_notes,
@@ -217,6 +218,7 @@ function renderRequestList() {
         <tr>
           <th>Status</th>
           <th>Request</th>
+          <th>Round</th>
           <th>Date</th>
           <th>Requester</th>
           <th>Institution</th>
@@ -235,21 +237,11 @@ function renderRequestList() {
           </span>
         </td>
 
-        <td>
-          ${escapeHtml(request.request_number)}
-        </td>
-
-        <td>
-          ${formatDate(request.created_at)}
-        </td>
-
-        <td>
-          ${escapeHtml(request.requester_name)}
-        </td>
-
-        <td>
-          ${escapeHtml(request.institution)}
-        </td>
+        <td>${escapeHtml(request.request_number)}</td>
+        <td>${escapeHtml(request.round || inferRound(request.request_number) || 'Unknown')}</td>
+        <td>${formatDate(request.created_at)}</td>
+        <td>${escapeHtml(request.requester_name)}</td>
+        <td>${escapeHtml(request.institution)}</td>
 
         <td>
           <button
@@ -263,11 +255,7 @@ function renderRequestList() {
     `;
   });
 
-  html += `
-      </tbody>
-    </table>
-  `;
-
+  html += '</tbody></table>';
   container.innerHTML = html;
 
   container
@@ -352,6 +340,11 @@ function renderRequestDetail() {
     </p>
 
     <p>
+      <strong>Round:</strong>
+      ${escapeHtml(request.round || inferRound(request.request_number) || 'Unknown')}
+    </p>
+
+    <p>
       <strong>Status:</strong>
       ${escapeHtml(request.status)}
     </p>
@@ -399,45 +392,46 @@ function renderModificationDetails() {
     <table>
       <thead>
         <tr>
+          <th>Round</th>
           <th>Project</th>
           <th>Activity</th>
+          <th>Proposed Activity</th>
           <th>Object Code</th>
           <th>Current Description</th>
           <th>Proposed Description</th>
           <th>Current Budget</th>
           <th>Proposed Budget</th>
+          <th>Flags</th>
         </tr>
       </thead>
       <tbody>
   `;
 
   request.modifications.forEach(row => {
+    const isDeleted = Boolean(row.is_deleted);
+    const isNew = Boolean(row.is_new_line);
+
     html += `
-      <tr>
+      <tr class="${isDeleted ? 'deleted-row' : ''}">
+        <td>${escapeHtml(row.round || request.round || '')}</td>
         <td>${escapeHtml(row.title)}</td>
         <td>${escapeHtml(row.activity_title)}</td>
+        <td>${escapeHtml(row.proposed_activity_title || '')}</td>
         <td>${escapeHtml(row.object_code)}</td>
+        <td>${escapeHtml(row.budget_item_description)}</td>
+        <td>${escapeHtml(row.proposed_description)}</td>
+        <td class="money">${formatCurrency(row.current_budget)}</td>
+        <td class="money">${formatCurrency(row.proposed_budget)}</td>
         <td>
-          ${escapeHtml(row.budget_item_description)}
-        </td>
-        <td>
-          ${escapeHtml(row.proposed_description)}
-        </td>
-        <td class="money">
-          ${formatCurrency(row.current_budget)}
-        </td>
-        <td class="money">
-          ${formatCurrency(row.proposed_budget)}
+          ${isDeleted ? '<span class="flag flag-delete">Marked Deleted</span>' : ''}
+          ${isNew ? '<span class="flag flag-new">New Line</span>' : ''}
+          ${!isDeleted && !isNew ? '<span class="flag">Updated</span>' : ''}
         </td>
       </tr>
     `;
   });
 
-  html += `
-      </tbody>
-    </table>
-  `;
-
+  html += '</tbody></table>';
   container.innerHTML = html;
 }
 
@@ -485,17 +479,25 @@ async function processRequest(action) {
 
     if (error) throw error;
 
-    await notifyRequester(
+    const notificationResult = await notifyRequester(
       request.requester_email,
       request.request_number,
       action,
-      notes
+      notes,
+      request.status_access_token
     );
 
-    showMessage(
-      `Request marked as ${action}.`,
-      'success'
-    );
+    if (notificationResult.warning) {
+      showMessage(
+        `Request marked as ${action}. Warning: ${notificationResult.warning}`,
+        'error'
+      );
+    } else {
+      showMessage(
+        `Request marked as ${action}.`,
+        'success'
+      );
+    }
 
     await loadRequests();
     showRequestList();
@@ -513,7 +515,8 @@ async function notifyRequester(
   email,
   requestNumber,
   action,
-  notes
+  notes,
+  statusToken
 ) {
   try {
     const response = await fetch(
@@ -523,13 +526,14 @@ async function notifyRequester(
         headers: {
           'Content-Type': 'application/json',
           apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+          Authorization: 'Bearer ' + SUPABASE_ANON_KEY
         },
         body: JSON.stringify({
           requester_email: email,
           request_number: requestNumber,
-          action: action,
-          notes: notes
+          action,
+          notes,
+          status_token: statusToken || null
         })
       }
     );
@@ -537,13 +541,20 @@ async function notifyRequester(
     const result = await response.json();
 
     if (!response.ok) {
-      console.error(
-        'Approval email failed:',
-        result.error || 'Unknown error'
-      );
+      return {
+        warning:
+          result.error ||
+          'Notification email was not sent.'
+      };
     }
+
+    return { warning: '' };
   } catch (error) {
-    console.error('Approval email failed:', error);
+    return {
+      warning:
+        error.message ||
+        'Notification email request failed.'
+    };
   }
 }
 
@@ -557,6 +568,130 @@ function showRequestList() {
     .classList.remove('hidden');
 
   state.selectedRequest = null;
+}
+
+async function loadRoundSettings() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('site_config')
+      .select('visible_rounds')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    state.visibleRounds = normalizeRoundList(data?.visible_rounds);
+
+    if (!state.visibleRounds.length) {
+      state.visibleRounds = ['R10'];
+    }
+
+    renderRoundSettings();
+  } catch (error) {
+    state.visibleRounds = ['R10'];
+    renderRoundSettings();
+    showMessage(
+      'Using default visible rounds. Could not load site settings.',
+      'error'
+    );
+  }
+}
+
+function renderRoundSettings() {
+  const grid = document.getElementById('roundSettingsGrid');
+
+  grid.innerHTML = ALL_ROUNDS.map(round => {
+    const checked = state.visibleRounds.includes(round)
+      ? 'checked'
+      : '';
+
+    return `
+      <label class="inline-checkbox">
+        <input type="checkbox" value="${round}" ${checked} />
+        ${round}
+      </label>
+    `;
+  }).join('');
+}
+
+async function saveRoundSettings(event) {
+  event.preventDefault();
+
+  const selectedRounds = Array.from(
+    document.querySelectorAll(
+      '#roundSettingsGrid input[type="checkbox"]:checked'
+    )
+  )
+    .map(input => input.value)
+    .sort(sortRound);
+
+  if (!selectedRounds.length) {
+    showMessage('Select at least one visible round.', 'error');
+    return;
+  }
+
+  try {
+    showLoading(true);
+
+    const { error } = await supabaseClient
+      .from('site_config')
+      .upsert(
+        {
+          id: 1,
+          visible_rounds: selectedRounds,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'id' }
+      );
+
+    if (error) throw error;
+
+    state.visibleRounds = selectedRounds;
+
+    showMessage('Visible round settings saved.', 'success');
+  } catch (error) {
+    showMessage(
+      'Unable to save round settings: ' + error.message,
+      'error'
+    );
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function loadActivityManagementPlaceholder() {
+  const placeholder = document.getElementById(
+    'activityManagementPlaceholderText'
+  );
+
+  try {
+    const { count, error } = await supabaseClient
+      .from('activity_management')
+      .select('id', { count: 'exact', head: true });
+
+    if (error) throw error;
+
+    placeholder.textContent =
+      `Future module ready. Placeholder table detected with ${count || 0} activity records.`;
+  } catch (error) {
+    const message = String(error?.message || '');
+    const missingTable =
+      error?.code === '42P01' ||
+      message.toLowerCase().includes('does not exist');
+
+    if (missingTable) {
+      placeholder.textContent =
+        'Future module: table not available yet in this environment. Apply DATABASE_SETUP.sql to enable it.';
+      return;
+    }
+
+    placeholder.textContent =
+      'Future module: setup exists but could not be loaded. Verify activity_management policies.';
+    showMessage(
+      'Unable to load activity management summary: ' + message,
+      'error'
+    );
+  }
 }
 
 async function signOut() {
@@ -575,6 +710,32 @@ async function signOut() {
     .classList.remove('hidden');
 
   document.getElementById('loginForm').reset();
+}
+
+function inferRound(value) {
+  const match = String(value || '').match(/\bR\s*(\d+)\b/i);
+  if (!match) return '';
+  return `R${Number(match[1])}`;
+}
+
+function normalizeRoundList(rounds) {
+  if (!Array.isArray(rounds)) return [];
+
+  return Array.from(
+    new Set(
+      rounds
+        .map(round => inferRound(round))
+        .filter(Boolean)
+    )
+  ).sort(sortRound);
+}
+
+function sortRound(a, b) {
+  return toRoundNumber(a) - toRoundNumber(b);
+}
+
+function toRoundNumber(round) {
+  return Number(String(round || '').replace(/[^0-9]/g, '')) || 0;
 }
 
 function formatCurrency(value) {
