@@ -25,9 +25,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (requestId) {
     document.getElementById('requestNumberInput').value = requestId;
-    handleLookup(new Event('submit'));
+    void runDeepLinkLookup();
   }
 });
+
+async function runDeepLinkLookup() {
+  try {
+    await handleLookup({
+      preventDefault() {}
+    });
+  } catch (error) {
+    showMessage('Lookup failed: ' + (error?.message || 'Unknown error'), 'error');
+  }
+}
 
 async function handleLookup(event) {
   event.preventDefault();

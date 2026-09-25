@@ -892,28 +892,35 @@ async function submitModification(event) {
 function validateModifications(flattened) {
   const errors = [];
 
-  const byActivity = flattened.reduce((groups, row) => {
-    const key = `${row.title}||${row.activity_title}`;
+  const byProjectActivity = new Map();
 
-    if (!groups[key]) {
-      groups[key] = [];
+  flattened.forEach(row => {
+    if (!byProjectActivity.has(row.title)) {
+      byProjectActivity.set(row.title, new Map());
     }
 
-    groups[key].push(row);
-    return groups;
-  }, {});
+    const activityMap = byProjectActivity.get(row.title);
 
-  Object.values(byActivity).forEach(activityRows => {
-    const sample = activityRows[0];
-    const hasBudgetedCategory = activityRows.some(
-      row => toNumber(row.proposed_budget) > 0
-    );
+    if (!activityMap.has(row.activity_title)) {
+      activityMap.set(row.activity_title, []);
+    }
 
-    if (!hasBudgetedCategory) {
-      errors.push(
-        `Activity ${sample.activity_title} must have at least one budgeted object category.`
+    activityMap.get(row.activity_title).push(row);
+  });
+
+  byProjectActivity.forEach(activityMap => {
+    activityMap.forEach(activityRows => {
+      const sample = activityRows[0];
+      const hasBudgetedCategory = activityRows.some(
+        row => toNumber(row.proposed_budget) > 0
       );
-    }
+
+      if (!hasBudgetedCategory) {
+        errors.push(
+          `Activity ${sample.activity_title} must have at least one budgeted object category.`
+        );
+      }
+    });
   });
 
   flattened.forEach(row => {
