@@ -45,6 +45,11 @@ body {
   gap: 16px;
 }
 
+.header-links {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
 .brand-mark {
   min-width: 88px;
   padding: 12px 10px;
@@ -408,6 +413,12 @@ hr {
 
 a {
   color: var(--navy);
+}
+
+.hint-text {
+  display: block;
+  color: var(--gray);
+  margin-top: 6px;
 }
 
 @media (max-width: 960px) {

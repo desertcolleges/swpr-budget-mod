@@ -14,6 +14,9 @@
           <div>
             <h1>Request Status Portal</h1>
             <p>Look up a submitted budget modification request.</p>
+            <p class="header-links">
+              <a href="/swpr-budget-mod/index.html">Requester Form</a>
+            </p>
           </div>
         </div>
       </header>
@@ -31,6 +34,9 @@
             <div>
               <label for="requesterEmailInput">Requester Email</label>
               <input id="requesterEmailInput" type="email" placeholder="name@example.edu" />
+              <small class="hint-text">
+                Required for manual lookup. Optional when using a secure emailed token link.
+              </small>
             </div>
           </div>
           <button class="button primary" type="submit">Lookup Request</button>

@@ -195,13 +195,20 @@ function renderRoundSelection() {
   const summaries = allowedRounds
     .map(round => summarizeRound(round))
     .filter(summary => summary.projectCount > 0);
+  const unmatchedCount = state.budgetRows.filter(
+    row => !row.inferred_round
+  ).length;
 
   if (!summaries.length) {
-    cards.innerHTML = '<p class="card">No visible round data found for this institution.</p>';
+    cards.innerHTML = `<p class="card">No visible round data found for this institution.${unmatchedCount > 0 ? ` ${unmatchedCount} row(s) are missing a recognizable round value.` : ''}</p>`;
     return;
   }
 
-  cards.innerHTML = summaries
+  const unmatchedNotice = unmatchedCount > 0
+    ? `<p class="card">Note: ${unmatchedCount} budget row(s) are not mapped to a recognizable round and are excluded.</p>`
+    : '';
+
+  cards.innerHTML = unmatchedNotice + summaries
     .map(summary => {
       const breakdown = summary.projects
         .slice(0, 5)
