@@ -175,14 +175,16 @@ as $$
   left join public.submission_modifications sm
     on sm.submission_id = bs.id
   where lower(bs.request_number) = lower(trim(p_request_number))
-    and p_requester_email is not null
-    and lower(bs.requester_email) = lower(trim(p_requester_email))
     and (
-      coalesce(trim(bs.status_access_token), '') = ''
-      or (
+      (
         p_status_token is not null
         and p_status_token <> ''
         and bs.status_access_token = p_status_token
+      )
+      or
+      (
+        p_requester_email is not null
+        and lower(bs.requester_email) = lower(trim(p_requester_email))
       )
     );
 $$;

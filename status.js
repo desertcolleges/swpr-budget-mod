@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('requestNumberInput').value = requestId;
 
     if (token) {
-      showMessage('Secure request link detected. Enter requester email to complete lookup.', 'success');
+      showMessage('Secure request link detected. You can run lookup now.', 'success');
     } else {
       showMessage('Enter requester email to view this request.', 'success');
     }
@@ -51,8 +51,8 @@ async function handleLookup(event) {
     return;
   }
 
-  if (!requesterEmail) {
-    showMessage('Requester email is required.', 'error');
+  if (!state.statusToken && !requesterEmail) {
+    showMessage('Requester email is required unless using a secure token link.', 'error');
     return;
   }
 
