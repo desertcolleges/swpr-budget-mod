@@ -788,7 +788,7 @@ function getExpenditureForBudgetRow(row, groupedExpenditures) {
 
 function inferRound(value) {
   const match = String(value || '').match(/\bR\s*(\d+)\b/i);
-  if (!match) return 'R10';
+  if (!match) return '';
   return `R${Number(match[1])}`;
 }
 

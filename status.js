@@ -8,7 +8,8 @@ const supabaseClient = window.supabase.createClient(
 
 const state = {
   request: null,
-  modifications: []
+  modifications: [],
+  statusToken: ''
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,11 +21,20 @@ document.addEventListener('DOMContentLoaded', () => {
     .getElementById('printRecordButton')
     .addEventListener('click', () => window.print());
 
-  const requestId = new URLSearchParams(window.location.search).get('requestId') || '';
+  const params = new URLSearchParams(window.location.search);
+  const requestId = params.get('requestId') || '';
+  const token = params.get('token') || '';
+
+  state.statusToken = token;
 
   if (requestId) {
     document.getElementById('requestNumberInput').value = requestId;
-    showMessage('Enter requester email to view this request.', 'success');
+
+    if (token) {
+      showMessage('Secure request link detected. You can run lookup now.', 'success');
+    } else {
+      showMessage('Enter requester email to view this request.', 'success');
+    }
   }
 });
 
@@ -36,8 +46,13 @@ async function handleLookup(event) {
   const requesterEmail =
     document.getElementById('requesterEmailInput').value.trim().toLowerCase();
 
-  if (!requestNumber || !requesterEmail) {
-    showMessage('Request number and requester email are required.', 'error');
+  if (!requestNumber) {
+    showMessage('Request number is required.', 'error');
+    return;
+  }
+
+  if (!state.statusToken && !requesterEmail) {
+    showMessage('Requester email is required unless using a secure token link.', 'error');
     return;
   }
 
@@ -45,13 +60,14 @@ async function handleLookup(event) {
     showLoading(true);
     clearMessage();
 
-    const lookup = await fetchBySecureRpc(requestNumber, requesterEmail);
-    if (!lookup) {
-      await fetchByFilteredSelect(requestNumber, requesterEmail);
-    }
+    await fetchBySecureRpc(
+      requestNumber,
+      requesterEmail,
+      state.statusToken
+    );
 
     if (!state.request) {
-      throw new Error('No request matched that request number and email.');
+      throw new Error('No request matched the provided lookup details.');
     }
 
     renderStatusRecord();
@@ -63,16 +79,14 @@ async function handleLookup(event) {
   }
 }
 
-async function fetchBySecureRpc(requestNumber, requesterEmail) {
+async function fetchBySecureRpc(requestNumber, requesterEmail, statusToken) {
   const { data, error } = await supabaseClient.rpc('get_request_status', {
     p_request_number: requestNumber,
-    p_requester_email: requesterEmail
+    p_requester_email: requesterEmail || null,
+    p_status_token: statusToken || null
   });
 
   if (error) {
-    if (String(error.message || '').toLowerCase().includes('function')) {
-      return false;
-    }
     throw error;
   }
 
@@ -80,7 +94,7 @@ async function fetchBySecureRpc(requestNumber, requesterEmail) {
   if (!rows.length) {
     state.request = null;
     state.modifications = [];
-    return true;
+    return;
   }
 
   const first = rows[0];
@@ -98,50 +112,21 @@ async function fetchBySecureRpc(requestNumber, requesterEmail) {
     reviewed_at: first.reviewed_at
   };
 
-  state.modifications = rows.map(row => ({
-    title: row.title,
-    activity_title: row.activity_title,
-    proposed_activity_title: row.proposed_activity_title,
-    object_code: row.object_code,
-    budget_item_description: row.budget_item_description,
-    proposed_description: row.proposed_description,
-    current_budget: row.current_budget,
-    proposed_budget: row.proposed_budget,
-    is_deleted: row.is_deleted,
-    is_new_line: row.is_new_line,
-    round: row.modification_round || row.round
-  }));
-
-  return true;
-}
-
-async function fetchByFilteredSelect(requestNumber, requesterEmail) {
-  const { data: submission, error } = await supabaseClient
-    .from('budget_submissions')
-    .select('*')
-    .eq('request_number', requestNumber)
-    .eq('requester_email', requesterEmail)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!submission) {
-    state.request = null;
-    state.modifications = [];
-    return;
-  }
-
-  const { data: modifications, error: modError } = await supabaseClient
-    .from('submission_modifications')
-    .select('*')
-    .eq('submission_id', submission.id)
-    .order('title')
-    .order('activity_title');
-
-  if (modError) throw modError;
-
-  state.request = submission;
-  state.modifications = modifications || [];
+  state.modifications = rows
+    .filter(row => row.title || row.proposed_description || row.activity_title)
+    .map(row => ({
+      title: row.title,
+      activity_title: row.activity_title,
+      proposed_activity_title: row.proposed_activity_title,
+      object_code: row.object_code,
+      budget_item_description: row.budget_item_description,
+      proposed_description: row.proposed_description,
+      current_budget: row.current_budget,
+      proposed_budget: row.proposed_budget,
+      is_deleted: row.is_deleted,
+      is_new_line: row.is_new_line,
+      round: row.modification_round || row.round
+    }));
 }
 
 function renderStatusRecord() {
@@ -157,7 +142,7 @@ function renderStatusRecord() {
       <p><strong>Requester:</strong> ${escapeHtml(request.requester_name || '')}</p>
       <p><strong>Email:</strong> ${escapeHtml(request.requester_email || '')}</p>
       <p><strong>Institution:</strong> ${escapeHtml(request.institution || '')}</p>
-      <p><strong>Round:</strong> ${escapeHtml(request.round || '')}</p>
+      <p><strong>Round:</strong> ${escapeHtml(request.round || 'Unknown')}</p>
       <p><strong>Status:</strong> <span class="status-badge status-${String(request.status || '').toLowerCase()}">${escapeHtml(request.status || '')}</span></p>
       <p><strong>Submitted:</strong> ${formatDate(request.created_at)}</p>
       <p><strong>Reviewed:</strong> ${formatDate(request.reviewed_at)}</p>

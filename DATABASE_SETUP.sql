@@ -22,6 +22,17 @@ alter table public.submission_modifications
 alter table public.budget_submissions
   add column if not exists round text;
 
+
+alter table public.budget_submissions
+  add column if not exists status_access_token text;
+
+update public.budget_submissions
+set status_access_token = encode(gen_random_bytes(16), 'hex')
+where status_access_token is null or length(trim(status_access_token)) = 0;
+
+alter table public.budget_submissions
+  alter column status_access_token set default encode(gen_random_bytes(16), 'hex');
+
 create table if not exists public.activity_management (
   id uuid primary key default gen_random_uuid(),
   project_title text,
@@ -113,7 +124,8 @@ with check (
 -- Secure requester status lookup: requires request number + requester email.
 create or replace function public.get_request_status(
   p_request_number text,
-  p_requester_email text
+  p_requester_email text default null,
+  p_status_token text default null
 )
 returns table (
   submission_id uuid,
@@ -170,8 +182,12 @@ as $$
   left join public.submission_modifications sm
     on sm.submission_id = bs.id
   where lower(bs.request_number) = lower(trim(p_request_number))
-    and lower(bs.requester_email) = lower(trim(p_requester_email));
+    and (
+      (p_status_token is not null and p_status_token <> '' and bs.status_access_token = p_status_token)
+      or
+      ((p_status_token is null or p_status_token = '') and p_requester_email is not null and lower(bs.requester_email) = lower(trim(p_requester_email)))
+    );
 $$;
 
-revoke all on function public.get_request_status(text, text) from public;
-grant execute on function public.get_request_status(text, text) to anon, authenticated;
+revoke all on function public.get_request_status(text, text, text) from public;
+grant execute on function public.get_request_status(text, text, text) to anon, authenticated;

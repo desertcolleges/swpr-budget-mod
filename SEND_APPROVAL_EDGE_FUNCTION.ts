@@ -33,7 +33,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { requester_email, request_number, action, notes } = body;
+    const { requester_email, request_number, action, notes, status_token } = body;
 
     if (!requester_email || !request_number || !action) {
       return new Response(
@@ -46,7 +46,10 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY is not configured");
     }
 
-    const statusLink = `${appBaseUrl}/status.html?requestId=${encodeURIComponent(request_number)}`;
+    const tokenQuery = status_token
+      ? `&token=${encodeURIComponent(status_token)}`
+      : "";
+    const statusLink = `${appBaseUrl}/status.html?requestId=${encodeURIComponent(request_number)}${tokenQuery}`;
     const subject = action === "Approved"
       ? `Budget Request Approved: ${request_number}`
       : `Budget Request Rejected: ${request_number}`;

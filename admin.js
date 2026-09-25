@@ -168,6 +168,7 @@ async function loadRequests() {
         requester_email,
         institution,
         round,
+        status_access_token,
         justification,
         status,
         admin_notes,
@@ -237,7 +238,7 @@ function renderRequestList() {
         </td>
 
         <td>${escapeHtml(request.request_number)}</td>
-        <td>${escapeHtml(request.round || inferRound(request.request_number))}</td>
+        <td>${escapeHtml(request.round || inferRound(request.request_number) || 'Unknown')}</td>
         <td>${formatDate(request.created_at)}</td>
         <td>${escapeHtml(request.requester_name)}</td>
         <td>${escapeHtml(request.institution)}</td>
@@ -340,7 +341,7 @@ function renderRequestDetail() {
 
     <p>
       <strong>Round:</strong>
-      ${escapeHtml(request.round || inferRound(request.request_number))}
+      ${escapeHtml(request.round || inferRound(request.request_number) || 'Unknown')}
     </p>
 
     <p>
@@ -482,7 +483,8 @@ async function processRequest(action) {
       request.requester_email,
       request.request_number,
       action,
-      notes
+      notes,
+      request.status_access_token
     );
 
     if (notificationResult.warning) {
@@ -513,7 +515,8 @@ async function notifyRequester(
   email,
   requestNumber,
   action,
-  notes
+  notes,
+  statusToken
 ) {
   try {
     const response = await fetch(
@@ -529,7 +532,8 @@ async function notifyRequester(
           requester_email: email,
           request_number: requestNumber,
           action,
-          notes
+          notes,
+          status_token: statusToken || null
         })
       }
     );
@@ -695,7 +699,7 @@ async function signOut() {
 
 function inferRound(value) {
   const match = String(value || '').match(/\bR\s*(\d+)\b/i);
-  if (!match) return 'R10';
+  if (!match) return '';
   return `R${Number(match[1])}`;
 }
 
